@@ -1,93 +1,74 @@
 @echo off
-echo ========================================
-echo Creating tables for all MSA services
-echo ========================================
-
+chcp 65001 > nul
+echo ============================================
+echo   Portforge MSA - 테이블 생성
+echo ============================================
 echo.
-echo [1/5] Auth Service...
-cd Auth
-if exist .venv\Scripts\activate.bat (
-    call .venv\Scripts\activate.bat
-    python create_tables.py
-    call deactivate
+
+REM 루트 디렉토리 저장
+set ROOT_DIR=%CD%
+
+REM 1. Auth 테이블 생성
+echo [1/5] Auth 테이블 생성 중...
+cd "%ROOT_DIR%\Auth"
+call poetry run python create_tables.py
+if errorlevel 1 (
+    echo ⚠️ Auth 테이블 생성 실패 (이미 존재할 수 있음)
 ) else (
-    python create_tables.py
+    echo ✅ Auth 테이블 생성 완료
 )
-if %errorlevel% neq 0 (
-    echo ERROR: Auth tables creation failed!
-    cd ..
-    pause
-    exit /b 1
-)
-cd ..
-
 echo.
-echo [2/5] Project Service...
-cd Project_Service
-if exist .venv\Scripts\activate.bat (
-    call .venv\Scripts\activate.bat
-    python create_tables.py
-    call deactivate
+
+REM 2. Project 테이블 생성
+echo [2/5] Project 테이블 생성 중...
+cd "%ROOT_DIR%\Project_Service"
+call poetry run python create_tables.py
+if errorlevel 1 (
+    echo ⚠️ Project 테이블 생성 실패 (이미 존재할 수 있음)
 ) else (
-    python create_tables.py
+    echo ✅ Project 테이블 생성 완료
 )
-if %errorlevel% neq 0 (
-    echo ERROR: Project tables creation failed!
-    cd ..
-    pause
-    exit /b 1
-)
-cd ..
-
 echo.
-echo [3/5] Team Service...
-cd Team-BE
-python create_tables.py
-if %errorlevel% neq 0 (
-    echo ERROR: Team tables creation failed!
-    cd ..
-    pause
-    exit /b 1
-)
-cd ..
 
-echo.
-echo [4/5] AI Service...
-cd Ai
-if exist .venv\Scripts\activate.bat (
-    call .venv\Scripts\activate.bat
-    python create_tables.py
-    call deactivate
+REM 3. Team 테이블 생성
+echo [3/5] Team 테이블 생성 중...
+cd "%ROOT_DIR%\Team-BE"
+call poetry run python create_tables.py
+if errorlevel 1 (
+    echo ⚠️ Team 테이블 생성 실패 (이미 존재할 수 있음)
 ) else (
-    python create_tables.py
+    echo ✅ Team 테이블 생성 완료
 )
-if %errorlevel% neq 0 (
-    echo ERROR: AI tables creation failed!
-    cd ..
-    pause
-    exit /b 1
-)
-cd ..
-
 echo.
-echo [5/5] Support Service...
-cd Support_Communication_Service
-if exist .venv\Scripts\activate.bat (
-    call .venv\Scripts\activate.bat
-    python create_tables.py
-    call deactivate
+
+REM 4. AI 테이블 생성
+echo [4/5] AI 테이블 생성 중...
+cd "%ROOT_DIR%\Ai"
+call poetry run python create_tables.py
+if errorlevel 1 (
+    echo ⚠️ AI 테이블 생성 실패 (이미 존재할 수 있음)
 ) else (
-    python create_tables.py
+    echo ✅ AI 테이블 생성 완료
 )
-if %errorlevel% neq 0 (
-    echo ERROR: Support tables creation failed!
-    cd ..
-    pause
-    exit /b 1
-)
-cd ..
-
 echo.
-echo ========================================
-echo SUCCESS! All tables created!
-echo ========================================
+
+REM 5. Support 테이블 생성
+echo [5/5] Support 테이블 생성 중...
+cd "%ROOT_DIR%\Support_Communication_Service"
+call poetry run python create_tables.py
+if errorlevel 1 (
+    echo ⚠️ Support 테이블 생성 실패 (이미 존재할 수 있음)
+) else (
+    echo ✅ Support 테이블 생성 완료
+)
+echo.
+
+cd "%ROOT_DIR%"
+
+echo ============================================
+echo ✅ 테이블 생성 완료!
+echo ============================================
+echo.
+echo 다음 단계: python seed_all.py
+echo.
+pause

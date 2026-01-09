@@ -333,8 +333,14 @@ async def create_project(project_data: dict, db: AsyncSession = Depends(get_db))
         user_id = project_data.get("user_id", f"user_{int(datetime.now().timestamp())}")
         
         # 프로젝트 타입 처리
-        project_type_str = project_data.get("type", "프로젝트")
-        project_type = ProjectType.PROJECT if project_type_str == "프로젝트" else ProjectType.STUDY
+        project_type_str = project_data.get("type", "PROJECT")
+        # PROJECT, 프로젝트 둘 다 지원
+        if project_type_str in ["PROJECT", "프로젝트", "project"]:
+            project_type = ProjectType.PROJECT
+        elif project_type_str in ["STUDY", "스터디", "study"]:
+            project_type = ProjectType.STUDY
+        else:
+            project_type = ProjectType.PROJECT  # 기본값
         
         # 진행 방식 처리
         method_str = project_data.get("method", "온라인")

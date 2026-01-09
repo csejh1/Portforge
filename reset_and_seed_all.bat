@@ -1,46 +1,45 @@
 @echo off
-echo ========================================
-echo MSA Database Reset and Seed Script
-echo ========================================
+chcp 65001 > nul
+echo ============================================
+echo   Portforge MSA - DB 초기화 및 시딩
+echo ============================================
 echo.
-echo This script will:
-echo 1. Drop and recreate all databases
-echo 2. Create tables from models
-echo 3. Seed initial data
+echo ⚠️  경고: 모든 데이터가 삭제됩니다!
 echo.
-echo WARNING: This will DELETE ALL DATA!
-echo.
-pause
-
-echo.
-echo [Step 1/3] Resetting databases...
-python reset_all_db.py
-if %errorlevel% neq 0 (
-    echo ERROR: Database reset failed!
+set /p confirm="계속하시겠습니까? (yes/no): "
+if /i not "%confirm%"=="yes" (
+    echo 취소되었습니다.
     pause
-    exit /b 1
+    exit /b 0
 )
 
 echo.
-echo [Step 2/3] Creating tables...
-python create_all_tables.py
-if %errorlevel% neq 0 (
-    echo ERROR: Table creation failed!
+echo [1/3] 데이터베이스 초기화 중...
+python reset_all_db.py < nul
+if errorlevel 1 (
+    echo ❌ 데이터베이스 초기화 실패
     pause
     exit /b 1
 )
-
 echo.
-echo [Step 3/3] Seeding data...
+
+echo [2/3] 테이블 생성 중...
+call create_all_tables.bat
+echo.
+
+echo [3/3] 시드 데이터 삽입 중...
 python seed_all.py
-if %errorlevel% neq 0 (
-    echo ERROR: Data seeding failed!
+if errorlevel 1 (
+    echo ❌ 시드 데이터 삽입 실패
     pause
     exit /b 1
 )
 
 echo.
-echo ========================================
-echo SUCCESS! All databases are ready!
-echo ========================================
+echo ============================================
+echo ✅ 초기화 완료!
+echo ============================================
+echo.
+echo 다음 단계: start_services.bat
+echo.
 pause

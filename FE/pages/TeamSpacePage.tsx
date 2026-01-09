@@ -1945,7 +1945,7 @@ const FileStorage = () => {
       formData.append('description', '');
 
       console.log('🔄 파일 업로드 중...');
-      const response = await fetch(`/api/v1/teams/${id}/files`, {
+      const response = await fetch(`/api/v1/teams/${id}/files/upload`, {
         method: 'POST',
         body: formData,
       });

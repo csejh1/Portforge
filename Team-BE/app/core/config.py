@@ -15,12 +15,22 @@ class Settings(BaseSettings):
     AWS_SECRET_ACCESS_KEY: Optional[str] = None
     AWS_REGION: str = "ap-northeast-2"
     S3_BUCKET_NAME: str = "team-platform-bucket"
+    S3_ENDPOINT_URL: Optional[str] = None
+    DDB_ENDPOINT_URL: Optional[str] = None
     
     # DynamoDB 설정
     DYNAMODB_TABLE_CHATS: str = "team_chats"
     DYNAMODB_TABLE_ROOMS: str = "chat_rooms"
     
+    # MinIO 설정 (로컬 개발용)
+    MINIO_ENDPOINT: str = "localhost:9000"
+    MINIO_ACCESS_KEY: str = "minioadmin"
+    MINIO_SECRET_KEY: str = "minioadmin"
+    MINIO_BUCKET: str = "portforge-files"
+    MINIO_SECURE: bool = False
+    
     class Config:
         env_file = ".env"
+        extra = "allow"  # .env 파일의 추가 키 허용
 
 settings = Settings()

@@ -33,7 +33,7 @@ class User(Base):
     @property
     def myStacks(self):
         """프론트엔드용 스택 문자열 리스트 반환"""
-        return [s.stack_name.value if hasattr(s.stack_name, 'value') else str(s.stack_name) for s in self.stacks]
+        return [str(s.stack_name) for s in self.stacks]
 
 class UserStack(Base):
     __tablename__ = "user_stacks"
@@ -41,7 +41,8 @@ class UserStack(Base):
     stack_id = Column(BigInteger, primary_key=True, autoincrement=True, comment='🔑 PK')
     user_id = Column(CHAR(36), ForeignKey("users.user_id", ondelete="CASCADE"), nullable=False, index=True)
     position_type = Column(SQLEnum(StackCategory), nullable=False)
-    stack_name = Column(SQLEnum(TechStack), nullable=False)
+    # String으로 변경 - 시드 데이터 호환성 및 유연성
+    stack_name = Column(String(50), nullable=False)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now())
     

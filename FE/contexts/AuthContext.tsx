@@ -148,7 +148,7 @@ interface AuthContextType {
   validateName: (name: string) => { available: boolean; message: string };
   checkNickname: (name: string) => Promise<{ available: boolean; message: string }>;
   applyToProject: (projectId: number, position: string, message: string) => Promise<void>;
-  handleApplication: (projectId: number, userId: string, action: 'accepted' | 'rejected') => void;
+  handleApplication: (projectId: number, userId: string, action: 'accepted' | 'rejected') => Promise<void>;
   toggleLike: (projectId: number) => void;
   addProject: (newProject: Omit<Project, 'id' | 'views' | 'status' | 'authorId' | 'authorName' | 'applicants'>) => void;
   updateProjectStatus: (projectId: number, status: '모집중' | '모집완료') => void;
@@ -163,6 +163,7 @@ interface AuthContextType {
   resolveReport: (id: number, resolutionType: string) => void;
   addEvent: (event: Omit<EventItem, 'id'>) => void;
   markNotificationsRead: () => void;
+  refreshNotifications: () => Promise<void>;
   changePassword: (oldPw: string, newPw: string) => Promise<void>;
   addTestResult: (result: TestResult) => void;
   addTeamTask: (task: Omit<TeamTask, 'id'>) => void;
@@ -243,6 +244,73 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
       return p;
     }));
+  }, []);
+
+  // 공지사항, 배너, 이벤트 로드
+  useEffect(() => {
+    const loadSupportData = async () => {
+      try {
+        // 공지사항 로드
+        const noticesResponse = await fetch('/notices');
+        if (noticesResponse.ok) {
+          const noticesData = await noticesResponse.json();
+          const noticesList = noticesData?.data || noticesData || [];
+          if (Array.isArray(noticesList) && noticesList.length > 0) {
+            setNotices(noticesList.map((n: any) => ({
+              id: n.notice_id || n.id,
+              title: n.title,
+              content: n.content,
+              date: n.created_at ? new Date(n.created_at).toLocaleDateString() : new Date().toLocaleDateString(),
+            })));
+          }
+        }
+      } catch (e) {
+        console.warn('공지사항 로드 실패:', e);
+      }
+
+      try {
+        // 배너 로드
+        const bannersResponse = await fetch('/banners');
+        if (bannersResponse.ok) {
+          const bannersData = await bannersResponse.json();
+          const bannersList = bannersData?.data || bannersData || [];
+          if (Array.isArray(bannersList) && bannersList.length > 0) {
+            setBanners(bannersList.map((b: any) => ({
+              id: b.banner_id || b.id,
+              title: b.title,
+              link: b.link,
+              active: b.is_active !== false,
+            })));
+          }
+        }
+      } catch (e) {
+        console.warn('배너 로드 실패:', e);
+      }
+
+      try {
+        // 이벤트 로드
+        const eventsResponse = await fetch('/events');
+        if (eventsResponse.ok) {
+          const eventsData = await eventsResponse.json();
+          const eventsList = eventsData?.data || eventsData || [];
+          if (Array.isArray(eventsList) && eventsList.length > 0) {
+            setEvents(eventsList.map((e: any) => ({
+              id: e.event_id || e.id,
+              category: e.category || '해커톤',
+              title: e.title,
+              date: e.start_date || e.date || '',
+              method: e.method || '온라인',
+              imageUrl: e.image_url || e.imageUrl || '',
+              description: e.description,
+            })));
+          }
+        }
+      } catch (e) {
+        console.warn('이벤트 로드 실패:', e);
+      }
+    };
+
+    loadSupportData();
   }, []);
 
   useEffect(() => {
@@ -419,6 +487,28 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       setUser(loggedInUser);
       localStorage.setItem('portforge_v8_user', JSON.stringify(loggedInUser));
+      
+      // 알림 조회
+      try {
+        const notiResponse = await fetch(`/notifications?user_id=${userId}`);
+        if (notiResponse.ok) {
+          const notiData = await notiResponse.json();
+          const notificationsList = notiData?.data || [];
+          const mappedNotifications: Notification[] = notificationsList.map((n: any) => ({
+            id: n.notification_id,
+            userId: n.user_id,
+            role: 'USER' as const,
+            message: n.message,
+            link: n.link || '/',
+            read: n.is_read || false,
+            date: n.created_at ? new Date(n.created_at).toLocaleDateString() : new Date().toLocaleDateString(),
+          }));
+          setNotifications(mappedNotifications);
+          console.log('🔔 알림 로드 완료:', mappedNotifications);
+        }
+      } catch (e) {
+        console.warn('알림 조회 실패:', e);
+      }
     } catch (error: any) {
       console.error('Login failed:', error);
       throw error;
@@ -531,36 +621,63 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
-  const handleApplication = (projectId: number, targetUserId: string, action: 'accepted' | 'rejected') => {
-    setProjects(prev => prev.map(p => {
-      if (p.id === projectId) {
-        let updatedMembers = p.members;
-        const applicant = p.applicants?.find(a => a.userId === targetUserId);
-
-        if (action === 'accepted' && applicant) {
-          const parts = p.members.split(', ');
-          const newParts = parts.map(part => {
-            if (part.includes(applicant.position)) {
-              const countMatch = part.match(/(\d+)\/(\d+)/);
-              if (countMatch) {
-                const curr = parseInt(countMatch[1]);
-                const target = parseInt(countMatch[2]);
-                return part.replace(`${curr}/${target}`, `${curr + 1}/${target}`);
-              }
-            }
-            return part;
-          });
-          updatedMembers = newParts.join(', ');
-        }
-
-        return {
-          ...p,
-          members: updatedMembers,
-          applicants: p.applicants?.map(a => a.userId === targetUserId ? { ...a, status: action } : a)
-        };
+  const handleApplication = async (projectId: number, targetUserId: string, action: 'accepted' | 'rejected') => {
+    try {
+      // 1. 백엔드 API 호출 (지원서 ID 찾기)
+      const applicationsResponse = await projectAPI.getApplications(projectId) as any;
+      const applicationsList = Array.isArray(applicationsResponse) 
+        ? applicationsResponse 
+        : (applicationsResponse?.data?.applications || []);
+      
+      const targetApp = applicationsList.find((app: any) => app.user_id === targetUserId);
+      
+      if (!targetApp) {
+        console.error('지원서를 찾을 수 없습니다:', targetUserId);
+        alert('지원서를 찾을 수 없습니다.');
+        return;
       }
-      return p;
-    }));
+      
+      // 2. 백엔드에 승인/거절 요청
+      await projectAPI.handleApplication(projectId, targetApp.application_id, action);
+      console.log(`✅ 지원 ${action === 'accepted' ? '승인' : '거절'} 완료:`, targetUserId);
+      
+      // 3. 로컬 상태 업데이트
+      setProjects(prev => prev.map(p => {
+        if (p.id === projectId) {
+          let updatedMembers = p.members;
+          const applicant = p.applicants?.find(a => a.userId === targetUserId);
+
+          if (action === 'accepted' && applicant) {
+            const parts = p.members.split(', ');
+            const newParts = parts.map(part => {
+              if (part.includes(applicant.position)) {
+                const countMatch = part.match(/(\d+)\/(\d+)/);
+                if (countMatch) {
+                  const curr = parseInt(countMatch[1]);
+                  const target = parseInt(countMatch[2]);
+                  return part.replace(`${curr}/${target}`, `${curr + 1}/${target}`);
+                }
+              }
+              return part;
+            });
+            updatedMembers = newParts.join(', ');
+          }
+
+          return {
+            ...p,
+            members: updatedMembers,
+            applicants: p.applicants?.map(a => a.userId === targetUserId ? { ...a, status: action } : a)
+          };
+        }
+        return p;
+      }));
+      
+      alert(action === 'accepted' ? '팀원으로 승인되었습니다!' : '지원이 거절되었습니다.');
+      
+    } catch (error: any) {
+      console.error('지원 처리 실패:', error);
+      alert('지원 처리 중 오류가 발생했습니다: ' + (error.message || '알 수 없는 오류'));
+    }
   };
 
   const resolveReport = (id: number, resolutionType: string) => {
@@ -590,6 +707,30 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const markNotificationsRead = () => {
     if (!user) return;
     setNotifications(prev => prev.map(n => (n.userId === user.id || (user.role === 'ADMIN' && n.role === 'ADMIN')) ? { ...n, read: true } : n));
+  };
+
+  const refreshNotifications = async () => {
+    if (!user) return;
+    try {
+      const response = await fetch(`/notifications?user_id=${user.id}`);
+      if (response.ok) {
+        const data = await response.json();
+        const notificationsList = data?.data || [];
+        const mappedNotifications: Notification[] = notificationsList.map((n: any) => ({
+          id: n.notification_id,
+          userId: n.user_id,
+          role: 'USER' as const,
+          message: n.message,
+          link: n.link || '/',
+          read: n.is_read || false,
+          date: n.created_at ? new Date(n.created_at).toLocaleDateString() : new Date().toLocaleDateString(),
+        }));
+        setNotifications(mappedNotifications);
+        console.log('🔔 알림 새로고침 완료:', mappedNotifications);
+      }
+    } catch (e) {
+      console.warn('알림 조회 실패:', e);
+    }
   };
 
   const changePassword = async (old: string, newP: string) => {
@@ -649,7 +790,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setUser({ ...user, likedProjects: updated });
       }, addProject, updateProjectStatus, deleteProject: (id) => setProjects(p => p.filter(x => x.id !== id)),
       addNotice, updateNotice, deleteNotice, addBanner, updateBanner, deleteBanner,
-      addReport, resolveReport, addEvent, markNotificationsRead, changePassword,
+      addReport, resolveReport, addEvent, markNotificationsRead, refreshNotifications, changePassword,
       loginWithSocial, checkNickname, addTestResult,
       addTeamTask, updateTeamTask, addTeamMeeting, updateTeamMeeting, addTeamFile
     }}>

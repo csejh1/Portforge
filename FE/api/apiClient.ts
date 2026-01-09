@@ -599,12 +599,22 @@ export const teamAPI = {
 // Support Service API (Port 8004)
 // =====================================================
 
+// 헬퍼 함수: ResponseEnvelope에서 data 추출
+const extractData = (response: any) => {
+    // ResponseEnvelope 구조: { success, code, message, data }
+    if (response && typeof response === 'object' && 'data' in response) {
+        return response.data;
+    }
+    return response;
+};
+
 export const supportAPI = {
     // 공지사항 목록
     getNotices: async (): Promise<any[]> => {
         const response = await fetch('/notices');
         if (!response.ok) return [];
-        return response.json();
+        const json = await response.json();
+        return extractData(json) || [];
     },
 
     // 공지사항 생성
@@ -615,21 +625,35 @@ export const supportAPI = {
             body: JSON.stringify(data),
         });
         if (!response.ok) throw new Error('공지사항 생성 실패');
-        return response.json();
+        const json = await response.json();
+        return extractData(json);
     },
 
     // 배너 목록
     getBanners: async (): Promise<any[]> => {
         const response = await fetch('/banners');
         if (!response.ok) return [];
-        return response.json();
+        const json = await response.json();
+        return extractData(json) || [];
     },
 
     // 이벤트 목록
-    getEvents: async (): Promise<any[]> => {
-        const response = await fetch('/events');
+    getEvents: async (category?: string): Promise<any[]> => {
+        const params = category ? `?category=${encodeURIComponent(category)}` : '';
+        const response = await fetch(`/events${params}`);
         if (!response.ok) return [];
-        return response.json();
+        const json = await response.json();
+        return extractData(json) || [];
+    },
+
+    // 알림 목록 조회
+    getNotifications: async (userId: string): Promise<any[]> => {
+        const response = await fetch(`/notifications?user_id=${userId}`, {
+            headers: getAuthHeaders(),
+        });
+        if (!response.ok) return [];
+        const json = await response.json();
+        return extractData(json) || [];
     },
 
     // 채팅 메시지 조회
@@ -638,7 +662,8 @@ export const supportAPI = {
             headers: getAuthHeaders(),
         });
         if (!response.ok) return [];
-        return response.json();
+        const json = await response.json();
+        return extractData(json) || [];
     },
 
     // 채팅 메시지 전송
@@ -649,7 +674,8 @@ export const supportAPI = {
             body: JSON.stringify({ message }),
         });
         if (!response.ok) throw new Error('메시지 전송 실패');
-        return response.json();
+        const json = await response.json();
+        return extractData(json);
     },
 };
 

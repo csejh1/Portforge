@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from typing import Optional
 from app.core.database import get_db
+from app.models.enums import TeamRole, StackCategory
 import logging
 from datetime import datetime
 from app.utils.s3_paths import get_team_s3_key, get_meeting_s3_key, get_file_upload_s3_key
@@ -575,7 +576,113 @@ async def update_task(
         )
 
 
-# 7. 파일 업로드 API
+# 6-1. 태스크 삭제 API
+@router.delete("/{project_id}/tasks/{task_id}")
+async def delete_task(
+    project_id: int,
+    task_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """태스크 삭제"""
+    from app.models.task import Task
+    
+    try:
+        result = await db.execute(
+            select(Task).where(Task.task_id == task_id, Task.project_id == project_id)
+        )
+        task = result.scalar_one_or_none()
+        
+        if not task:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="태스크를 찾을 수 없습니다."
+            )
+        
+        await db.delete(task)
+        await db.commit()
+        
+        return {
+            "success": True,
+            "message": "태스크가 삭제되었습니다.",
+            "task_id": task_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"태스크 삭제 실패: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"태스크 삭제 중 오류 발생: {str(e)}"
+        )
+
+
+# 7. 파일 업로드 API (FormData 지원)
+@router.post("/{project_id}/files/upload", status_code=status.HTTP_201_CREATED)
+async def upload_file_multipart(
+    project_id: int,
+    file: UploadFile = File(...),
+    user_id: str = Form(...),
+    description: str = Form(""),
+    db: AsyncSession = Depends(get_db)
+):
+    """파일 업로드 (실제 파일 + 메타데이터 저장)"""
+    from app.models.team import Team, SharedFile
+    from app.services.file_service import FileService
+    
+    try:
+        # 팀 확인
+        team_result = await db.execute(select(Team).where(Team.project_id == project_id))
+        team = team_result.scalar_one_or_none()
+        
+        if not team:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="팀을 찾을 수 없습니다."
+            )
+        
+        # MinIO에 파일 업로드
+        file_service = FileService()
+        upload_result = file_service.upload_file(file, team.team_id, user_id)
+        
+        # DB에 메타데이터 저장
+        shared_file = SharedFile(
+            team_id=team.team_id,
+            file_name=file.filename,
+            file_size=upload_result["file_size"],
+            s3_key=upload_result["s3_key"],
+            uploaded_by=user_id,
+            description=description
+        )
+        
+        db.add(shared_file)
+        await db.commit()
+        await db.refresh(shared_file)
+        
+        return {
+            "success": True,
+            "message": "파일이 업로드되었습니다.",
+            "file": {
+                "file_id": shared_file.file_id,
+                "name": shared_file.file_name,
+                "size": f"{shared_file.file_size / 1024 / 1024:.2f} MB" if shared_file.file_size else "0 MB",
+                "s3_key": shared_file.s3_key,
+                "uploaded_by": shared_file.uploaded_by,
+                "created_at": shared_file.created_at.isoformat() if shared_file.created_at else None
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"파일 업로드 실패: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"파일 업로드 중 오류 발생: {str(e)}"
+        )
+
+
+# 7-1. 파일 업로드 API (JSON - 메타데이터만)
 @router.post("/{project_id}/files", status_code=status.HTTP_201_CREATED)
 async def upload_file(
     project_id: int,
@@ -824,3 +931,243 @@ async def upload_team_file(
     except Exception as e:
         logger.error(f"파일 업로드 실패: {str(e)}")
         return {"status": "error", "message": str(e)}
+
+
+# ============= 추가 API (프론트엔드 연동용) =============
+
+@router.get("")
+async def get_teams(db: AsyncSession = Depends(get_db)):
+    """팀 목록 조회"""
+    try:
+        from app.models.team import Team
+        
+        result = await db.execute(select(Team).order_by(Team.created_at.desc()))
+        teams = result.scalars().all()
+        
+        return [
+            {
+                "team_id": team.team_id,
+                "project_id": team.project_id,
+                "name": team.name,
+                "s3_key": team.s3_key,
+                "created_at": team.created_at.isoformat() if team.created_at else None
+            }
+            for team in teams
+        ]
+    except Exception as e:
+        logger.error(f"팀 목록 조회 실패: {str(e)}")
+        return []
+
+
+@router.get("/team/{team_id}")
+async def get_team_by_id(team_id: int, db: AsyncSession = Depends(get_db)):
+    """팀 상세 조회 (team_id 기준)"""
+    try:
+        from app.models.team import Team, TeamMember
+        
+        result = await db.execute(select(Team).where(Team.team_id == team_id))
+        team = result.scalar_one_or_none()
+        
+        if not team:
+            raise HTTPException(status_code=404, detail="팀을 찾을 수 없습니다.")
+        
+        # 멤버 조회
+        members_result = await db.execute(
+            select(TeamMember).where(TeamMember.team_id == team_id)
+        )
+        members = members_result.scalars().all()
+        
+        return {
+            "team_id": team.team_id,
+            "project_id": team.project_id,
+            "name": team.name,
+            "s3_key": team.s3_key,
+            "created_at": team.created_at.isoformat() if team.created_at else None,
+            "members": [
+                {
+                    "user_id": m.user_id,
+                    "role": str(m.role).split('.')[-1] if m.role else 'MEMBER',
+                    "position_type": str(m.position_type).split('.')[-1] if m.position_type else 'UNKNOWN'
+                }
+                for m in members
+            ]
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"팀 상세 조회 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("")
+async def create_team(team_data: dict, db: AsyncSession = Depends(get_db)):
+    """팀 생성"""
+    try:
+        from app.models.team import Team, TeamMember
+        from app.models.enums import TeamRole, StackCategory
+        
+        project_id = team_data.get("project_id")
+        name = team_data.get("name", f"프로젝트 {project_id} 팀")
+        leader_id = team_data.get("leader_id")
+        leader_position = team_data.get("leader_position", "BACKEND")
+        
+        if not project_id:
+            raise HTTPException(status_code=400, detail="project_id는 필수입니다.")
+        
+        # 이미 존재하는지 확인
+        existing = await db.execute(select(Team).where(Team.project_id == project_id))
+        if existing.scalar_one_or_none():
+            raise HTTPException(status_code=400, detail="이미 팀이 존재합니다.")
+        
+        # 팀 생성
+        team = Team(
+            project_id=project_id,
+            name=name,
+            s3_key=get_team_s3_key(project_id)
+        )
+        db.add(team)
+        await db.flush()
+        
+        # 리더 추가
+        if leader_id:
+            # 포지션 타입 변환
+            position_map = {
+                "프론트엔드": StackCategory.FRONTEND,
+                "백엔드": StackCategory.BACKEND,
+                "디자인": StackCategory.DESIGN,
+                "FRONTEND": StackCategory.FRONTEND,
+                "BACKEND": StackCategory.BACKEND,
+                "DESIGN": StackCategory.DESIGN,
+            }
+            position_type = position_map.get(leader_position, StackCategory.BACKEND)
+            
+            leader = TeamMember(
+                team_id=team.team_id,
+                user_id=leader_id,
+                role=TeamRole.LEADER,
+                position_type=position_type
+            )
+            db.add(leader)
+        
+        await db.commit()
+        
+        return {
+            "status": "success",
+            "message": "팀이 생성되었습니다.",
+            "data": {
+                "team_id": team.team_id,
+                "project_id": team.project_id,
+                "name": team.name
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"팀 생성 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/members")
+async def add_team_member(member_data: dict, db: AsyncSession = Depends(get_db)):
+    """팀 멤버 추가 (지원 승인 시 호출됨)"""
+    try:
+        from app.models.team import Team, TeamMember
+        from app.models.enums import TeamRole, StackCategory
+        
+        project_id = member_data.get("project_id")
+        user_id = member_data.get("user_id")
+        position_type_str = member_data.get("position_type", "BACKEND")
+        role_str = member_data.get("role", "MEMBER")
+        
+        if not project_id or not user_id:
+            raise HTTPException(status_code=400, detail="project_id와 user_id는 필수입니다.")
+        
+        # 팀 조회
+        team_result = await db.execute(select(Team).where(Team.project_id == project_id))
+        team = team_result.scalar_one_or_none()
+        
+        if not team:
+            raise HTTPException(status_code=404, detail="팀을 찾을 수 없습니다.")
+        
+        # 이미 멤버인지 확인
+        existing = await db.execute(
+            select(TeamMember).where(
+                TeamMember.team_id == team.team_id,
+                TeamMember.user_id == user_id
+            )
+        )
+        if existing.scalar_one_or_none():
+            return {"status": "success", "message": "이미 팀 멤버입니다."}
+        
+        # 포지션 타입 변환
+        position_map = {
+            "FRONTEND": StackCategory.FRONTEND,
+            "BACKEND": StackCategory.BACKEND,
+            "DESIGN": StackCategory.DESIGN,
+            "DB": StackCategory.DB,
+            "INFRA": StackCategory.INFRA,
+            "ETC": StackCategory.ETC,
+        }
+        position_type = position_map.get(position_type_str.upper(), StackCategory.BACKEND)
+        
+        # 역할 변환
+        role = TeamRole.LEADER if role_str.upper() == "LEADER" else TeamRole.MEMBER
+        
+        # 멤버 추가
+        member = TeamMember(
+            team_id=team.team_id,
+            user_id=user_id,
+            role=role,
+            position_type=position_type
+        )
+        db.add(member)
+        await db.commit()
+        
+        logger.info(f"✅ 팀 멤버 추가: {user_id} -> 팀 {team.team_id}")
+        
+        return {
+            "status": "success",
+            "message": "팀 멤버가 추가되었습니다.",
+            "data": {
+                "team_id": team.team_id,
+                "user_id": user_id,
+                "role": role_str,
+                "position_type": position_type_str
+            }
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"팀 멤버 추가 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/by-project/{project_id}")
+async def delete_team_by_project(project_id: int, db: AsyncSession = Depends(get_db)):
+    """프로젝트 ID로 팀 삭제"""
+    try:
+        from app.models.team import Team, TeamMember
+        
+        # 팀 조회
+        team_result = await db.execute(select(Team).where(Team.project_id == project_id))
+        team = team_result.scalar_one_or_none()
+        
+        if not team:
+            return {"status": "success", "message": "삭제할 팀이 없습니다."}
+        
+        # 팀 멤버 삭제
+        await db.execute(
+            text(f"DELETE FROM team_members WHERE team_id = {team.team_id}")
+        )
+        
+        # 팀 삭제
+        await db.delete(team)
+        await db.commit()
+        
+        return {"status": "success", "message": "팀이 삭제되었습니다."}
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"팀 삭제 실패: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

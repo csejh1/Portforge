@@ -119,7 +119,7 @@ const transformProject = (apiProject: any): Project => {
 
   return {
     id: apiProject.project_id || apiProject.id,
-    type: apiProject.type === 'PROJECT' ? '프로젝트' : (apiProject.type === '프로젝트' || apiProject.type === '스터디' ? apiProject.type : '프로젝트'),
+    type: apiProject.type === 'PROJECT' ? '프로젝트' : apiProject.type === 'STUDY' ? '스터디' : (apiProject.type === '프로젝트' || apiProject.type === '스터디' ? apiProject.type : '프로젝트'),
     title: apiProject.title,
     description: apiProject.description || '',
     deadline: deadline,

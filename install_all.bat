@@ -1,53 +1,117 @@
 @echo off
-echo 📦 Installing dependencies for all microservices...
-echo ================================================
+chcp 65001 > nul
+echo ============================================
+echo   Portforge MSA - 전체 환경 설치
+echo ============================================
+echo.
 
-echo.
-echo 📥 Installing root dependencies (poe tasks)...
-poetry install
-echo Done.
+REM 루트 디렉토리 저장
+set ROOT_DIR=%CD%
 
+REM 1. 루트 Poetry 설치
+echo [1/7] 루트 의존성 설치 중...
+call poetry install --no-root
+if errorlevel 1 (
+    echo ❌ 루트 Poetry 설치 실패
+    pause
+    exit /b 1
+)
+echo ✅ 루트 의존성 설치 완료
 echo.
-echo 📥 Installing Auth Service dependencies...
-cd Auth
-poetry install
-cd ..
 
+REM 2. Auth 서비스
+echo [2/7] Auth 서비스 설치 중...
+cd "%ROOT_DIR%\Auth"
+if not exist ".env" copy ".env.example" ".env" 2>nul
+call poetry install --no-root
+if errorlevel 1 (
+    echo ❌ Auth 서비스 설치 실패
+    cd "%ROOT_DIR%"
+    pause
+    exit /b 1
+)
+echo ✅ Auth 서비스 설치 완료
 echo.
-echo 📥 Installing Project Service dependencies...
-cd Project_Service
-poetry install
-cd ..
 
+REM 3. Project 서비스
+echo [3/7] Project 서비스 설치 중...
+cd "%ROOT_DIR%\Project_Service"
+if not exist ".env" copy ".env.example" ".env" 2>nul
+call poetry install --no-root
+if errorlevel 1 (
+    echo ❌ Project 서비스 설치 실패
+    cd "%ROOT_DIR%"
+    pause
+    exit /b 1
+)
+echo ✅ Project 서비스 설치 완료
 echo.
-echo 📥 Installing Team Service dependencies...
-cd Team-BE
-poetry install
-cd ..
 
+REM 4. Team 서비스
+echo [4/7] Team 서비스 설치 중...
+cd "%ROOT_DIR%\Team-BE"
+if not exist ".env" copy ".env.example" ".env" 2>nul
+call poetry install --no-root
+if errorlevel 1 (
+    echo ❌ Team 서비스 설치 실패
+    cd "%ROOT_DIR%"
+    pause
+    exit /b 1
+)
+echo ✅ Team 서비스 설치 완료
 echo.
-echo 📥 Installing AI Service dependencies...
-cd Ai
-poetry install
-cd ..
 
+REM 5. AI 서비스
+echo [5/7] AI 서비스 설치 중...
+cd "%ROOT_DIR%\Ai"
+if not exist ".env" copy ".env.example" ".env" 2>nul
+call poetry install --no-root
+if errorlevel 1 (
+    echo ❌ AI 서비스 설치 실패
+    cd "%ROOT_DIR%"
+    pause
+    exit /b 1
+)
+echo ✅ AI 서비스 설치 완료
 echo.
-echo 📥 Installing Support Service dependencies...
-cd Support_Communication_Service
-poetry install
-cd ..
 
+REM 6. Support 서비스
+echo [6/7] Support 서비스 설치 중...
+cd "%ROOT_DIR%\Support_Communication_Service"
+if not exist ".env" copy ".env.example" ".env" 2>nul
+call poetry install --no-root
+if errorlevel 1 (
+    echo ❌ Support 서비스 설치 실패
+    cd "%ROOT_DIR%"
+    pause
+    exit /b 1
+)
+echo ✅ Support 서비스 설치 완료
 echo.
-echo ✅ ALL DEPENDENCIES INSTALLED!
-echo ================================================
+
+REM 7. Frontend
+echo [7/7] Frontend 설치 중...
+cd "%ROOT_DIR%\FE"
+call npm install
+if errorlevel 1 (
+    echo ❌ Frontend 설치 실패
+    cd "%ROOT_DIR%"
+    pause
+    exit /b 1
+)
+echo ✅ Frontend 설치 완료
 echo.
-echo Available poe commands (from root):
-echo   poetry run poe db-up        - Start Docker infrastructure
-echo   poetry run poe health-check - Check all services
-echo   poetry run poe run-auth     - Run Auth service
-echo   poetry run poe run-project  - Run Project service
-echo   poetry run poe run-team     - Run Team service
-echo   poetry run poe run-ai       - Run AI service
-echo   poetry run poe run-support  - Run Support service
+
+cd "%ROOT_DIR%"
+
+echo ============================================
+echo ✅ 모든 서비스 설치 완료!
+echo ============================================
+echo.
+echo 다음 단계:
+echo   1. Docker 실행: docker compose up -d
+echo   2. 테이블 생성: create_all_tables.bat
+echo   3. 시드 데이터: python seed_all.py
+echo   4. 서비스 시작: start_services.bat
 echo.
 pause

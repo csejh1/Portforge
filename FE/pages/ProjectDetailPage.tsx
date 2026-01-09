@@ -64,6 +64,9 @@ const ProjectDetailPage: React.FC = () => {
 
   // 지원자 정보 보강 (DB에서 점수 조회) - Hook은 early return 전에 선언
   const [enrichedApplicants, setEnrichedApplicants] = useState<any[]>([]);
+  
+  // 팀 멤버 정보 (백엔드에서 조회) - 리더 여부 확인용
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
 
   const projectId = Number(id);
 
@@ -116,25 +119,53 @@ const ProjectDetailPage: React.FC = () => {
     }
   }, [showReviewModal, projectData]);
 
+  // 팀 멤버 정보 로드 (리더 여부 확인용)
+  useEffect(() => {
+    if (projectData?.id && user?.id) {
+      const loadTeamMembers = async () => {
+        try {
+          const response = await fetch(`/api/v1/teams/${projectData.id}/stats`);
+          if (response.ok) {
+            const data = await response.json();
+            if (data?.members) {
+              setTeamMembers(data.members);
+              console.log('📋 팀 멤버 로드 완료:', data.members);
+            }
+          }
+        } catch (e) {
+          console.warn('팀 멤버 로드 실패:', e);
+        }
+      };
+      loadTeamMembers();
+    }
+  }, [projectData?.id, user?.id]);
+
   // 팀장인 경우 실제 지원자 목록 API 호출 (추가됨)
   useEffect(() => {
-    if (projectData && user && String(user.id) === String(projectData.authorId)) {
+    // 프로젝트가 로드되면 지원자 목록도 로드 (팀장 여부와 관계없이)
+    if (projectData?.id) {
       const loadApplications = async () => {
         try {
-          // 이미 로드되었는지 확인하는 로직이 있으면 좋음
           const response = await projectAPI.getApplications(projectData.id) as any;
+          
+          // API 응답이 배열로 직접 오거나, { data: { applications: [] } } 구조일 수 있음
+          const applicationsList = Array.isArray(response) 
+            ? response 
+            : (response?.data?.applications || response?.applications || []);
 
-          if (response?.data?.applications) {
-            const apps = response.data.applications.map((app: any) => ({
+          if (applicationsList.length > 0) {
+            const apps = applicationsList.map((app: any) => ({
               userId: app.user_id,
               userName: app.user_id,
               position: app.position_type,
-              message: app.message,
+              message: app.message || '',
               status: app.status.toLowerCase(),
               score: app.score,
               level: app.level,
               feedback: app.feedback,
             }));
+            
+            console.log('📋 지원자 목록 로드 완료:', apps);
 
             // 데이터가 실제로 변경되었을 때만 업데이트 (무한루프 방지)
             setProjectData(prev => {
@@ -149,7 +180,7 @@ const ProjectDetailPage: React.FC = () => {
       };
       loadApplications();
     }
-  }, [projectData?.id, user?.id]);
+  }, [projectData?.id]);
 
   if (loading) {
     return (
@@ -163,19 +194,41 @@ const ProjectDetailPage: React.FC = () => {
     return <div className="p-20 text-center font-black text-text-sub">{error || '프로젝트를 찾을 수 없습니다.'}</div>;
   }
 
-  const isAuthor = user?.id === projectData.authorId;
+  const isAuthor = !!(user?.id && projectData.authorId && (user.id === projectData.authorId || String(user.id) === String(projectData.authorId)));
   // 로그인한 사용자가 이 프로젝트에 지원했거나 참여중인지 확인
   const application = user?.appliedProjects?.find(p =>
     p.id === projectId || p.id === Number(projectId) || String(p.id) === String(projectId)
   );
-  const isAcceptedMember = application?.status === 'accepted';
+  // 프로젝트의 applicants에서도 확인 (백엔드에서 로드된 데이터)
+  const applicationFromProject = projectData.applicants?.find(a => 
+    a.userId === user?.id || String(a.userId) === String(user?.id)
+  );
+  const hasApplied = !!application || !!applicationFromProject;
+  // 팀 멤버로 등록되어 있는지 확인 (백엔드 데이터 기반)
+  const isTeamMember = teamMembers.some(m => 
+    m.user_id === user?.id || String(m.user_id) === String(user?.id)
+  );
+  const isAcceptedMember = application?.status === 'accepted' || applicationFromProject?.status === 'accepted' || isTeamMember;
+  // 리더로 등록된 프로젝트인지 확인 (appliedProjects + 백엔드 팀 멤버 데이터)
+  const isLeaderFromApplied = user?.appliedProjects?.some(p => 
+    (p.id === projectId || String(p.id) === String(projectId)) && p.userRole === 'Leader'
+  );
+  // 백엔드 팀 멤버 데이터에서 리더 여부 확인
+  const isLeaderFromTeam = teamMembers.some(m => 
+    (m.user_id === user?.id || String(m.user_id) === String(user?.id)) && m.role === 'LEADER'
+  );
+  const isLeader = isLeaderFromApplied || isLeaderFromTeam;
 
   // 디버그 로그
   console.log('📋 프로젝트 상세 디버그:', {
     projectId,
     isAuthor,
+    isLeader,
+    isLeaderFromApplied,
+    isLeaderFromTeam,
     authorId: projectData.authorId,
     userId: user?.id,
+    teamMembers,
     appliedProjects: user?.appliedProjects,
     application,
     isAcceptedMember
@@ -429,7 +482,7 @@ const ProjectDetailPage: React.FC = () => {
             </div>
 
             <div className="flex flex-col items-center gap-3">
-              {isAuthor && (
+              {(isAuthor || isLeader) && (
                 <button
                   onClick={() => setShowReviewModal(true)}
                   className="w-full bg-white text-text-main border-2 border-gray-100 px-12 py-4 rounded-[2rem] font-bold transition-all shadow-lg hover:shadow-xl hover:bg-gray-50 flex items-center justify-center gap-2"
@@ -442,17 +495,24 @@ const ProjectDetailPage: React.FC = () => {
                   )}
                 </button>
               )}
-              {isAuthor || isAcceptedMember ? (
+              {isAuthor || isLeader || isAcceptedMember ? (
                 <Link to={`/team-space/${projectId}`} className="bg-secondary text-white px-12 py-5 rounded-[2rem] font-black transition-all shadow-xl text-lg hover:scale-105 shadow-secondary/20 flex items-center gap-2">
                   <span>🚀</span> 팀 스페이스 가기
                 </Link>
+              ) : !user ? (
+                <button
+                  onClick={() => navigate('/login')}
+                  className="px-12 py-5 rounded-[2rem] font-black transition-all shadow-xl text-lg bg-primary text-white hover:scale-105 shadow-primary/20"
+                >
+                  로그인하고 지원하기
+                </button>
               ) : (
                 <button
                   onClick={() => setApplyStep('position_select')}
-                  disabled={!!application || projectData.status === '모집완료'}
-                  className={`px-12 py-5 rounded-[2rem] font-black transition-all shadow-xl text-lg ${application || projectData.status === '모집완료' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-primary text-white hover:scale-105 shadow-primary/20'}`}
+                  disabled={hasApplied || projectData.status === '모집완료'}
+                  className={`px-12 py-5 rounded-[2rem] font-black transition-all shadow-xl text-lg ${hasApplied || projectData.status === '모집완료' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-primary text-white hover:scale-105 shadow-primary/20'}`}
                 >
-                  {projectData.status === '모집완료' ? '모집이 종료되었습니다' : (application ? (application.status === 'pending' ? '지원 심사 중' : '지원 완료') : '지금 지원하기')}
+                  {projectData.status === '모집완료' ? '모집이 종료되었습니다' : (hasApplied ? ((application?.status || applicationFromProject?.status) === 'pending' ? '지원 심사 중' : '지원 완료') : '지금 지원하기')}
                 </button>
               )}
             </div>

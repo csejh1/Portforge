@@ -106,12 +106,12 @@ def seed_project():
                 ({PROJECT_ID}, 'DESIGN', 'Figma', 1, 0, DATE_ADD(CURDATE(), INTERVAL 7 DAY), NOW())
             """))
 
-            # Applications 삽입
+            # Applications 삽입 (prefer_stacks 컬럼 제거됨)
             conn.execute(text(f"""
-                INSERT INTO applications (project_id, user_id, position_type, prefer_stacks, message, status, created_at)
+                INSERT INTO applications (project_id, user_id, position_type, message, status, created_at)
                 VALUES 
-                ({PROJECT_ID}, '{MEMBER_ID}', 'BACKEND', 'Nodejs', '열심히하겠습니다!', 'ACCEPTED', NOW()),
-                ({PROJECT_ID}, '{MEMBER2_ID}', 'DESIGN', 'Figma', '디자인 경험 많습니다!', 'PENDING', NOW())
+                ({PROJECT_ID}, '{MEMBER_ID}', 'BACKEND', '열심히하겠습니다!', 'ACCEPTED', NOW()),
+                ({PROJECT_ID}, '{MEMBER2_ID}', 'DESIGN', '디자인 경험 많습니다!', 'PENDING', NOW())
             """))
             
             trans.commit()
