@@ -11,7 +11,7 @@
 ```bash
 git clone https://github.com/csejh1/Portforge.git
 cd Portforge
-setup.bat
+.\setup.bat
 ```
 
 끝! 스크립트가 모든 것을 자동으로 설정합니다.
@@ -24,24 +24,23 @@ setup.bat
 git stash
 git pull origin main
 git stash pop
-start_services.bat
+.\start_services.bat
 ```
 
-> DB 스키마 변경 시에만: `reset_and_seed_all.bat`
+> DB 스키마 변경 시에만: `.\reset_and_seed_all.bat`
 
 ---
 
-## 테스트 계정
-| 이메일 | 비밀번호 |
-|--------|----------|
-| admin@example.com | devpass123 |
-| member@example.com | devpass123 |
-| member2@example.com | devpass123 |
+## 시작하기
+1. 서비스 시작: `.\start_services.bat`
+2. 접속: http://localhost:3000
+3. 회원가입 (이메일 인증 필요)
+4. 로그인 후 프로젝트 생성/참여
 
 ---
 
 ## 문제 발생 시
 ```bash
 docker compose down -v
-setup.bat
+.\setup.bat
 ```

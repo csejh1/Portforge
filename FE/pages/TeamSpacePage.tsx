@@ -456,10 +456,11 @@ const TeamChat = ({
   removeToast: (id: number) => void;
 }) => {
   const { user } = useAuth();
+  const { id } = useParams(); // URL에서 프로젝트 ID 가져오기
 
-  // TODO: 실제 환경에서는 props나 context에서 가져와야 함
-  const teamId = 1;
-  const projectId = 1;
+  // URL 파라미터에서 projectId 가져오기 (팀별 고유 채팅)
+  const projectId = Number(id) || 1;
+  const teamId = projectId; // 팀 ID는 프로젝트 ID와 동일하게 사용
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
@@ -793,15 +794,16 @@ const TeamChat = ({
 
 
 const MeetingManager = () => {
+  const { id } = useParams(); // URL에서 프로젝트 ID 가져오기
   const [minutesList, setMinutesList] = useState<MinutesResponse[]>([]);
   const [selectedMinutes, setSelectedMinutes] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [viewLoading, setViewLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // TODO: 실제 환경에서는 props나 context에서 가져와야 함
-  const teamId = 1;
-  const projectId = 1;
+  // URL 파라미터에서 projectId 가져오기 (팀별 고유 회의록)
+  const projectId = Number(id) || 1;
+  const teamId = projectId; // 팀 ID는 프로젝트 ID와 동일하게 사용
 
   // localStorage에서 생성 중 상태 확인
   const [isMinutesGenerating, setIsMinutesGenerating] = useState(() => {
@@ -1050,7 +1052,9 @@ const MeetingManager = () => {
 
 
 const ProjectPortfolio = () => {
+  const { id } = useParams(); // URL에서 프로젝트 ID 가져오기
   const { user } = useAuth();
+  const projectId = Number(id) || 1;
 
   // 토스트 훅 사용
   const { addToast, updateToast, removeToast, toasts } = useToast();
@@ -1059,19 +1063,19 @@ const ProjectPortfolio = () => {
   const [portfolioList, setPortfolioList] = useState<PortfolioResult[]>([]);
   const [selectedPortfolio, setSelectedPortfolio] = useState<PortfolioResult | null>(null);
   const [isGenerating, setIsGenerating] = useState(() => {
-    const saved = localStorage.getItem('portfolio_generating');
+    const saved = localStorage.getItem(`portfolio_generating_${projectId}`);
     return saved === 'true';
   });
 
   // 포트폴리오 목록 로드
   useEffect(() => {
     loadPortfolioList();
-  }, []);
+  }, [projectId]);
 
   const loadPortfolioList = async () => {
     // TODO: API 구현 후 실제 목록 조회
-    // 현재는 localStorage에서 복원
-    const saved = localStorage.getItem('portfolio_list');
+    // 현재는 localStorage에서 복원 (프로젝트별로 분리)
+    const saved = localStorage.getItem(`portfolio_list_${projectId}`);
     if (saved) {
       const list = JSON.parse(saved);
       setPortfolioList(list);
@@ -1094,12 +1098,12 @@ const ProjectPortfolio = () => {
     }
 
     setIsGenerating(true);
-    localStorage.setItem('portfolio_generating', 'true');
+    localStorage.setItem(`portfolio_generating_${projectId}`, 'true');
 
     const toastId = addToast('loading', '포트폴리오를 생성하는 중입니다...');
 
     try {
-      const data = await generatePortfolio(user.id, 1);
+      const data = await generatePortfolio(user.id, projectId);
 
       // 생성 날짜 추가
       const portfolioWithDate = {
@@ -1112,8 +1116,8 @@ const ProjectPortfolio = () => {
       setPortfolioList(newList);
       setSelectedPortfolio(portfolioWithDate);
 
-      // localStorage에 저장
-      localStorage.setItem('portfolio_list', JSON.stringify(newList));
+      // localStorage에 저장 (프로젝트별로 분리)
+      localStorage.setItem(`portfolio_list_${projectId}`, JSON.stringify(newList));
 
       removeToast(toastId);
       addToast('success', '포트폴리오가 생성되었습니다! 🎉');
@@ -1123,13 +1127,13 @@ const ProjectPortfolio = () => {
       addToast('error', `포트폴리오 생성 실패: ${error.message || error}`);
     } finally {
       setIsGenerating(false);
-      localStorage.removeItem('portfolio_generating');
+      localStorage.removeItem(`portfolio_generating_${projectId}`);
     }
   };
 
   const handleCancelGeneration = () => {
     setIsGenerating(false);
-    localStorage.removeItem('portfolio_generating');
+    localStorage.removeItem(`portfolio_generating_${projectId}`);
     addToast('info', '포트폴리오 생성이 취소되었습니다.');
   };
 

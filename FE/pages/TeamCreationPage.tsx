@@ -59,7 +59,7 @@ const TeamCreationPage: React.FC = () => {
     selectedStacks: [] as string[],
     startDate: '',
     endDate: '',
-    recruitPeriod: '14',
+    recruitDeadline: '',
     testRequired: false,
     description: ''
   });
@@ -117,8 +117,20 @@ const TeamCreationPage: React.FC = () => {
     e.preventDefault();
     if (!formData.title.trim()) return alert('제목을 입력해주세요.');
 
+    if (!formData.recruitDeadline) return alert('모집 마감일을 선택해주세요.');
     if (!formData.startDate) return alert('활동 시작일을 선택해주세요.');
     if (!formData.endDate) return alert('예상 종료일을 선택해주세요.');
+    
+    // 날짜 유효성 검사
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const recruitDeadline = new Date(formData.recruitDeadline);
+    const startDate = new Date(formData.startDate);
+    const endDate = new Date(formData.endDate);
+    
+    if (recruitDeadline < today) return alert('모집 마감일은 오늘 이후여야 합니다.');
+    if (startDate < recruitDeadline) return alert('활동 시작일은 모집 마감일 이후여야 합니다.');
+    if (endDate < startDate) return alert('예상 종료일은 활동 시작일 이후여야 합니다.');
 
     if (formData.type === '프로젝트') {
       if (totalMembers === 0) return alert('모집할 포지션 인원을 1명 이상 설정해주세요.');
@@ -136,19 +148,36 @@ const TeamCreationPage: React.FC = () => {
 
     try {
       // API 요청 데이터 구성
+      // 각 포지션에 해당 카테고리의 스택 + 공통 스택(인기)을 모두 포함
       const recruitmentPositions = formData.type === '프로젝트'
         ? RECRUIT_POSITIONS
           .filter(pos => formData.positionCounts[pos.id] > 0)
-          .map(pos => ({
-            position_type: pos.name,
-            target_count: formData.positionCounts[pos.id],
-            required_stacks: formData.selectedStacks.filter(s =>
-              (STACK_CATEGORIES[pos.cat] || []).includes(s)
-            )
-          }))
-        : [{ position_type: '스터디원', target_count: formData.studyCapacity, required_stacks: formData.selectedStacks }];
+          .map(pos => {
+            // 해당 포지션 카테고리에 속하는 스택 필터링
+            const categoryStacks = STACK_CATEGORIES[pos.cat] || [];
+            const positionStacks = formData.selectedStacks.filter(s => categoryStacks.includes(s));
+            
+            // 만약 해당 카테고리에 매칭되는 스택이 없으면 선택된 모든 스택 사용
+            const finalStacks = positionStacks.length > 0 ? positionStacks : formData.selectedStacks;
+            
+            return {
+              position_type: pos.name,
+              target_count: formData.positionCounts[pos.id],
+              required_stacks: finalStacks,
+              recruitment_deadline: formData.recruitDeadline
+            };
+          })
+        : [{ 
+            position_type: '스터디원', 
+            target_count: formData.studyCapacity, 
+            required_stacks: formData.selectedStacks,
+            recruitment_deadline: formData.recruitDeadline
+          }];
+
+      console.log('📋 생성할 모집 포지션:', recruitmentPositions);
 
       const projectData = {
+        user_id: user.id,  // 사용자 ID 추가
         type: formData.type === '프로젝트' ? 'PROJECT' : 'STUDY',
         title: formData.title,
         description: formData.description,
@@ -158,6 +187,8 @@ const TeamCreationPage: React.FC = () => {
         test_required: formData.testRequired,
         recruitment_positions: recruitmentPositions
       };
+
+      console.log('📤 프로젝트 생성 요청 데이터:', projectData);
 
       await projectAPI.createProject(projectData);
 
@@ -214,22 +245,35 @@ const TeamCreationPage: React.FC = () => {
           </div>
 
           <div className="grid md:grid-cols-3 gap-8 pt-6 border-t border-gray-50">
-            <FormItem label="모집 마감 (D-Day)" required>
-              <select
-                value={formData.recruitPeriod}
-                onChange={e => setFormData({ ...formData, recruitPeriod: e.target.value })}
-                className="w-full bg-gray-50 p-5 rounded-2xl font-black border-none outline-none text-sm appearance-none"
-              >
-                <option value="7">7일 뒤</option>
-                <option value="14">14일 뒤</option>
-                <option value="30">30일 뒤</option>
-              </select>
+            <FormItem label="모집 마감일" required>
+              <input 
+                type="date" 
+                required 
+                value={formData.recruitDeadline} 
+                onChange={e => setFormData({ ...formData, recruitDeadline: e.target.value })} 
+                min={new Date().toISOString().split('T')[0]}
+                className="w-full bg-gray-50 p-5 rounded-2xl font-black border-none outline-none text-sm focus:ring-2 focus:ring-primary/20 accent-primary" 
+              />
             </FormItem>
             <FormItem label="활동 시작일" required>
-              <input type="date" required value={formData.startDate} onChange={e => setFormData({ ...formData, startDate: e.target.value })} className="w-full bg-gray-50 p-5 rounded-2xl font-black border-none outline-none text-sm focus:ring-2 focus:ring-primary/20 accent-primary" />
+              <input 
+                type="date" 
+                required 
+                value={formData.startDate} 
+                onChange={e => setFormData({ ...formData, startDate: e.target.value })} 
+                min={formData.recruitDeadline || new Date().toISOString().split('T')[0]}
+                className="w-full bg-gray-50 p-5 rounded-2xl font-black border-none outline-none text-sm focus:ring-2 focus:ring-primary/20 accent-primary" 
+              />
             </FormItem>
             <FormItem label="예상 종료일" required>
-              <input type="date" required value={formData.endDate} onChange={e => setFormData({ ...formData, endDate: e.target.value })} className="w-full bg-gray-50 p-5 rounded-2xl font-black border-none outline-none text-sm focus:ring-2 focus:ring-primary/20 accent-primary" />
+              <input 
+                type="date" 
+                required 
+                value={formData.endDate} 
+                onChange={e => setFormData({ ...formData, endDate: e.target.value })} 
+                min={formData.startDate || new Date().toISOString().split('T')[0]}
+                className="w-full bg-gray-50 p-5 rounded-2xl font-black border-none outline-none text-sm focus:ring-2 focus:ring-primary/20 accent-primary" 
+              />
             </FormItem>
           </div>
 

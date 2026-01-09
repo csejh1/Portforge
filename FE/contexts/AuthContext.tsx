@@ -399,11 +399,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const login = async (email: string, pass: string) => {
     setLoading(true);
     try {
-      // 개발용 비밀번호면 devLogin 사용
-      const isDevLogin = pass === 'devpass123';
-      const response = isDevLogin
-        ? await authAPI.devLogin({ email, password: pass })
-        : await authAPI.login({ email, password: pass });
+      // Cognito 로그인
+      const response = await authAPI.login({ email, password: pass });
 
       // 토큰 저장
       localStorage.setItem('access_token', response.access_token);
@@ -494,6 +491,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         name: response.user.nickname,
         email: response.user.email,
         role: (response.user.role || '').toUpperCase() === 'ADMIN' ? 'ADMIN' : 'USER',
+        avatarUrl: response.user.profile_image_url || undefined,  // 프로필 이미지 URL
         myStacks: response.user.myStacks || [],
         appliedProjects: appliedProjects,
         testResults: testResults
@@ -818,7 +816,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         if (!user) return;
         const liked = user.likedProjects || [];
         const updated = liked.includes(id) ? liked.filter(x => x !== id) : [...liked, id];
-        setUser({ ...user, likedProjects: updated });
+        const updatedUser = { ...user, likedProjects: updated };
+        setUser(updatedUser);
+        localStorage.setItem('portforge_v8_user', JSON.stringify(updatedUser));
       }, addProject, updateProjectStatus, deleteProject: (id) => setProjects(p => p.filter(x => x.id !== id)),
       addNotice, updateNotice, deleteNotice, addBanner, updateBanner, deleteBanner,
       addReport, resolveReport, addEvent, markNotificationsRead, refreshNotifications, changePassword,

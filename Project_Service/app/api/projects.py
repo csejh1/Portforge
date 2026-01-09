@@ -3,11 +3,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from typing import List, Optional
+import json
 from app.models.project_recruitment import Project, Application, ProjectRecruitmentPosition
 from app.schemas.project import ProjectResponse, ApplicationResponse, ProjectDetailResponse, RecruitmentPositionResponse
 from app.core.database import get_db
 
 router = APIRouter(prefix="/projects", tags=["projects"])
+
+def _parse_required_stacks(required_stacks) -> List[str]:
+    """required_stacks 필드를 파싱하여 리스트로 반환"""
+    if not required_stacks:
+        return []
+    if isinstance(required_stacks, list):
+        return required_stacks
+    if isinstance(required_stacks, str):
+        try:
+            parsed = json.loads(required_stacks)
+            return parsed if isinstance(parsed, list) else []
+        except:
+            return []
+    return []
 
 @router.get("", response_model=List[ProjectDetailResponse])
 async def get_projects(
@@ -50,7 +65,7 @@ async def get_projects(
             recruitment_positions=[
                 RecruitmentPositionResponse(
                     position_type=pos.position_type.value if hasattr(pos.position_type, 'value') else str(pos.position_type),
-                    required_stacks=[pos.required_stacks.value] if pos.required_stacks and hasattr(pos.required_stacks, 'value') else [],
+                    required_stacks=_parse_required_stacks(pos.required_stacks),
                     target_count=pos.target_count or 0,
                     current_count=pos.current_count or 0,
                     recruitment_deadline=pos.recruitment_deadline
@@ -92,7 +107,7 @@ async def get_project_detail(
         recruitment_positions=[
             RecruitmentPositionResponse(
                 position_type=pos.position_type.value if hasattr(pos.position_type, 'value') else str(pos.position_type),
-                required_stacks=[pos.required_stacks.value] if pos.required_stacks and hasattr(pos.required_stacks, 'value') else [],
+                required_stacks=_parse_required_stacks(pos.required_stacks),
                 target_count=pos.target_count or 0,
                 current_count=pos.current_count or 0,
                 recruitment_deadline=pos.recruitment_deadline

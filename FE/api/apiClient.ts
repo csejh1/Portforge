@@ -63,20 +63,6 @@ export const authAPI = {
         return response.json();
     },
 
-    // [개발용] 테스트 로그인 (Cognito 우회)
-    devLogin: async (data: LoginRequest): Promise<LoginResponse> => {
-        const response = await fetch('/auth/dev-login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data),
-        });
-        if (!response.ok) {
-            const error = await response.json().catch(() => ({}));
-            throw new Error(error.message || error.detail || '개발용 로그인에 실패했습니다.');
-        }
-        return response.json();
-    },
-
     // 회원가입
     signUp: async (data: SignUpRequest): Promise<any> => {
         const response = await fetch('/auth/join', {
@@ -168,11 +154,17 @@ export const authAPI = {
     },
 
     // 프로필 수정
-    updateProfile: async (data: { name?: string; myStacks?: string[] }): Promise<void> => {
+    updateProfile: async (data: { name?: string; myStacks?: string[]; avatarUrl?: string }): Promise<void> => {
+        // avatarUrl을 profile_image_url로 변환하여 백엔드에 전송
+        const payload: any = {};
+        if (data.name) payload.name = data.name;
+        if (data.myStacks) payload.myStacks = data.myStacks;
+        if (data.avatarUrl) payload.profile_image_url = data.avatarUrl;
+        
         const response = await fetch('/users/me', {
             method: 'PUT',
             headers: getAuthHeaders(),
-            body: JSON.stringify(data),
+            body: JSON.stringify(payload),
         });
         if (!response.ok) {
             const error = await response.json().catch(() => ({}));

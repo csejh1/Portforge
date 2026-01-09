@@ -64,7 +64,7 @@ const LoginPage: React.FC = () => {
             <span className="text-3xl font-black text-secondary tracking-tighter">Portforge</span>
           </Link>
           <h2 className="text-2xl font-black text-text-main tracking-tight">돌아오신 것을 환영합니다!</h2>
-          <p className="mt-2 text-text-sub font-medium">관리자 계정 ID: <span className="text-primary font-black">user1</span></p>
+          <p className="mt-2 text-text-sub font-medium">프로젝트 팀 매칭 플랫폼</p>
         </div>
 
         {error && (
@@ -81,7 +81,7 @@ const LoginPage: React.FC = () => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             className="block w-full px-6 py-4 bg-gray-50 border-2 border-transparent rounded-[1.5rem] focus:border-primary focus:bg-white focus:outline-none transition-all font-bold text-sm"
-            placeholder="이메일 또는 아이디 (관리자: user1)"
+            placeholder="이메일"
           />
           <input
             type="password"
@@ -114,31 +114,8 @@ const LoginPage: React.FC = () => {
 
         <div className="flex flex-col gap-3">
           <SocialBtn label="카카오톡으로 로그인" color="bg-[#FEE500] text-black" onClick={() => handleSocialLogin('Kakao')} icon="💬" />
-          <SocialBtn label="네이버로 로그인" color="bg-[#03C75A] text-white" onClick={() => handleSocialLogin('Naver')} icon="N" />
           <SocialBtn label="구글로 로그인" color="bg-white border border-gray-100 text-gray-700" onClick={() => handleSocialLogin('Google')} icon="G" />
         </div>
-
-        {/* 개발용 테스트 계정 (프로덕션에서 제거) */}
-        <div className="relative flex items-center py-4">
-          <div className="flex-grow border-t border-gray-100"></div>
-          <span className="flex-shrink mx-6 text-text-sub text-[10px] font-black uppercase tracking-[0.2em]">🧪 테스트 계정</span>
-          <div className="flex-grow border-t border-gray-100"></div>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => { setEmail('admin@example.com'); setPassword('devpass123'); }}
-            className="flex-1 py-2.5 px-4 bg-amber-100 text-amber-700 rounded-xl text-xs font-black hover:bg-amber-200 transition-all"
-          >
-            👑 관리자
-          </button>
-          <button
-            onClick={() => { setEmail('member@example.com'); setPassword('devpass123'); }}
-            className="flex-1 py-2.5 px-4 bg-blue-100 text-blue-700 rounded-xl text-xs font-black hover:bg-blue-200 transition-all"
-          >
-            👤 일반 유저
-          </button>
-        </div>
-        <p className="text-center text-[10px] text-gray-400 font-medium">테스트 계정 클릭 후 로그인 버튼을 누르세요</p>
 
         <div className="text-center pt-2">
           <p className="text-xs text-text-sub font-bold">

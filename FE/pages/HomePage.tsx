@@ -117,6 +117,41 @@ const transformProject = (apiProject: any): Project => {
     deadline = calculateDDay(deadlineDate);
   }
 
+  // members 문자열 생성 - 백엔드에서 제공하거나 recruitment_positions에서 생성
+  let members = apiProject.members;
+  if (!members || members === '0/0명') {
+    const positions = apiProject.recruitment_positions || [];
+    if (positions.length > 0) {
+      const posNameMap: Record<string, string> = {
+        'FRONTEND': '프론트엔드',
+        'BACKEND': '백엔드',
+        'DESIGN': '디자인',
+        'DB': 'DB',
+        'INFRA': '인프라',
+        'ETC': '기타',
+        '프론트엔드': '프론트엔드',
+        '백엔드': '백엔드',
+        '디자인': '디자인',
+        '스터디원': '스터디원'
+      };
+      members = positions.map((p: any) => {
+        const posName = posNameMap[p.position_type] || p.position_type;
+        return `${posName} ${p.current_count || 0}/${p.target_count || 0}`;
+      }).join(', ');
+    }
+  }
+
+  // tags 추출 - 백엔드에서 제공하거나 recruitment_positions에서 추출
+  let tags = apiProject.tags || [];
+  if ((!tags || tags.length === 0) && apiProject.recruitment_positions) {
+    const allStacks = new Set<string>();
+    apiProject.recruitment_positions.forEach((p: any) => {
+      const stacks = p.required_stacks || [];
+      stacks.forEach((s: string) => allStacks.add(s));
+    });
+    tags = Array.from(allStacks);
+  }
+
   return {
     id: apiProject.project_id || apiProject.id,
     type: apiProject.type === 'PROJECT' ? '프로젝트' : apiProject.type === 'STUDY' ? '스터디' : (apiProject.type === '프로젝트' || apiProject.type === '스터디' ? apiProject.type : '프로젝트'),
@@ -124,10 +159,8 @@ const transformProject = (apiProject: any): Project => {
     description: apiProject.description || '',
     deadline: deadline,
     views: apiProject.views || 0,
-    members: apiProject.members || apiProject.recruitment_positions?.map((p: any) =>
-      `${p.position_type} ${p.current_count || 0}/${p.target_count}`
-    ).join(', ') || '',
-    tags: apiProject.tags || apiProject.recruitment_positions?.flatMap((p: any) => p.required_stacks || []) || [],
+    members: members || '',
+    tags: tags,
     position: apiProject.position || apiProject.recruitment_positions?.[0]?.position_type || '미정',
     method: apiProject.method === 'ONLINE' ? '온라인' : apiProject.method === 'OFFLINE' ? '오프라인' : (apiProject.method || '온/오프라인'),
     status: apiProject.status === 'RECRUITING' ? '모집중' : (apiProject.status === '모집중' || apiProject.status === '모집완료' ? apiProject.status : '모집완료'),
@@ -500,17 +533,22 @@ const TopProjectCard: React.FC<{ project: Project, rank: number, isLiked: boolea
           ))}
         </div>
 
-        {/* 기술 스택 (전체 표시) */}
-        <div className="flex flex-wrap gap-1.5">
-          {project.tags.map((tag: string, idx: number) => (
-            <span
-              key={idx}
-              className="text-xs font-bold text-gray-600 bg-gray-100 px-2 py-1 rounded-lg"
-            >
-              #{tag}
-            </span>
-          ))}
-        </div>
+        {/* 기술 스택 - 해시태그 형태 */}
+        {project.tags && project.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {project.tags.slice(0, 5).map((tag: string, idx: number) => (
+              <span
+                key={idx}
+                className="text-[10px] font-bold text-primary/70 bg-primary/5 px-2 py-0.5 rounded-md"
+              >
+                #{tag}
+              </span>
+            ))}
+            {project.tags.length > 5 && (
+              <span className="text-[10px] text-gray-400 px-1">+{project.tags.length - 5}</span>
+            )}
+          </div>
+        )}
 
         {/* 하단: 진행기간, 모집현황 */}
         <div className="flex justify-between items-end pt-3 border-t border-gray-100">
@@ -594,22 +632,24 @@ const ProjectCard = ({ project, isLiked, onLike }: any) => {
             <span className="text-xs text-gray-400 font-bold">+{recruitments.length - 3}</span>
           )}
         </div>
-      </div>
 
-      {/* 기술 스택 */}
-      <div className="flex flex-wrap gap-1.5">
-        {project.tags.slice(0, 4).map((tag: string, idx: number) => (
-          <span
-            key={idx}
-            className="text-xs font-bold text-gray-600 bg-gray-100 px-2 py-1 rounded-lg"
-          >
-            #{tag}
-          </span>
-        ))}
-        {project.tags.length > 4 && (
-          <span className="text-xs text-gray-400 px-2 py-1 font-bold">
-            +{project.tags.length - 4}
-          </span>
+        {/* 기술 스택 - 해시태그 형태 */}
+        {project.tags && project.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {project.tags.slice(0, 4).map((tag: string, idx: number) => (
+              <span
+                key={idx}
+                className="text-[10px] font-bold text-primary/70 bg-primary/5 px-2 py-0.5 rounded-md"
+              >
+                #{tag}
+              </span>
+            ))}
+            {project.tags.length > 4 && (
+              <span className="text-[10px] text-gray-400 px-1 font-bold">
+                +{project.tags.length - 4}
+              </span>
+            )}
+          </div>
         )}
       </div>
 

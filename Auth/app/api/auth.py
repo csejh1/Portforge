@@ -234,7 +234,11 @@ def update_user_me(
     if user_data.name:
         current_user.nickname = user_data.name
     
-    # 2. 기술 스택 수정 (전체 삭제 후 재생성)
+    # 2. 프로필 이미지 수정
+    if user_data.profile_image_url is not None:
+        current_user.profile_image_url = user_data.profile_image_url
+    
+    # 3. 기술 스택 수정 (전체 삭제 후 재생성)
     if user_data.myStacks is not None:
         # 기존 스택 삭제
         db.query(UserStack).filter(UserStack.user_id == current_user.user_id).delete()
@@ -698,41 +702,4 @@ async def resend_verification_code(email: str):
             raise BusinessException(ErrorCode.AUTH_RESEND_FAILED, f"재발송 실패: {str(e)}")
 
 
-# =================================================================
-# [개발용] 테스트 로그인 API (Cognito 우회)
-# ⚠️ 프로덕션 환경에서는 반드시 비활성화할 것!
-# =================================================================
-@router.post("/auth/dev-login")
-async def dev_login(user_in: UserLogin, db: Session = Depends(get_db)):
-    """
-    [개발용 전용] Cognito를 우회하고 DB에 저장된 사용자로 바로 로그인
-    - 이메일만 확인하고 비밀번호는 'devpass123' 고정
-    - 실제 액세스 토큰은 발급되지 않음 (더미 토큰 사용)
-    """
-    # 개발용 비밀번호 체크
-    if user_in.password != "devpass123":
-        raise BusinessException(ErrorCode.AUTH_INVALID_CREDENTIALS, "개발용 비밀번호가 틀렸습니다. (devpass123)")
-    
-    # DB에서 사용자 조회
-    user = db.scalar(select(User).where(User.email == user_in.email))
-    if not user:
-        raise BusinessException(ErrorCode.USER_NOT_FOUND, f"DB에 해당 사용자가 없습니다: {user_in.email}")
-    
-    # 더미 토큰 생성 (실제로는 JWT가 아님)
-    dummy_token = f"dev-token-{user.user_id}"
-    
-    logger.warning(f"⚠️ DEV LOGIN: {user.email} (user_id: {user.user_id})")
-    
-    return {
-        "access_token": dummy_token,
-        "id_token": dummy_token,
-        "token_type": "Bearer",
-        "user": {
-            "user_id": user.user_id,
-            "email": user.email,
-            "nickname": user.nickname,
-            "role": user.role.value if hasattr(user.role, 'value') else str(user.role),
-            "profile_image_url": user.profile_image_url,
-            "myStacks": user.myStacks
-        }
-    }
+

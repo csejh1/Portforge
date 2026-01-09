@@ -5,7 +5,7 @@ import { useAuth, Project } from '../contexts/AuthContext';
 import { useAi } from '../contexts/AiContext';
 import { fetchUserTestResult } from '../api/aiClient';
 import { projectAPI } from '../api/apiClient';
-import { STACK_CATEGORIES_BASE, parseRecruitment, calculateDDay, calculateDuration } from './HomePage';
+import { STACK_CATEGORIES_BASE, parseRecruitment, calculateDDay, calculateDuration, getStackLogoUrl } from './HomePage';
 
 // API 응답을 프론트엔드 형식으로 변환
 const transformProject = (apiProject: any): Project => {
@@ -561,7 +561,6 @@ const ProjectDetailPage: React.FC = () => {
                       <div className="flex justify-between items-center">
                         <div className="flex items-center gap-3">
                           <span className="font-black text-base text-text-main">{rec.pos}</span>
-                          {rec.stack && <span className="text-[10px] font-black text-primary bg-primary/5 px-2 py-0.5 rounded"># {rec.stack}</span>}
                         </div>
                         <span className={`text-sm font-black ${rec.current >= rec.target ? 'text-gray-400' : 'text-primary'}`}>{rec.current}/{rec.target}</span>
                       </div>
@@ -569,6 +568,21 @@ const ProjectDetailPage: React.FC = () => {
                   ))}
                 </div>
               </div>
+
+              {/* 기술 스택 - 아이콘과 이름 함께 표시 */}
+              {projectData.tags && projectData.tags.length > 0 && (
+                <div className="space-y-4 w-full">
+                  <p className="text-[10px] text-text-sub font-black uppercase">사용 기술 스택</p>
+                  <div className="flex flex-wrap gap-2">
+                    {projectData.tags.map((tag: string, idx: number) => (
+                      <div key={idx} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-xl border border-gray-100">
+                        <img src={getStackLogoUrl(tag)} className="w-5 h-5 object-contain" alt={tag} onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+                        <span className="text-xs font-bold text-text-main">{tag}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 

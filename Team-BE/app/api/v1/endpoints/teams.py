@@ -164,17 +164,44 @@ async def get_tasks(project_id: int, status: Optional[str] = None, db: AsyncSess
         return []
 
 @router.get("/{project_id}/files")
-async def get_files(project_id: int):
-    """파일 목록 조회 (Mock 데이터)"""
-    return [
-        {
-            "file_id": 1,
-            "project_id": project_id,
-            "file_name": "기획안_최종.pdf",
-            "file_size": 1200000,
-            "created_at": datetime.now().isoformat()
+async def get_team_files(project_id: int, db: AsyncSession = Depends(get_db)):
+    """팀 파일 목록 조회"""
+    try:
+        from app.models.team import Team
+        
+        # 팀 ID 조회
+        team_result = await db.execute(select(Team).where(Team.project_id == project_id))
+        team = team_result.scalar_one_or_none()
+        
+        if not team:
+            return {"success": True, "files": [], "message": "팀을 찾을 수 없습니다."}
+            
+        # 파일 목록 조회
+        result = await db.execute(
+            select(SharedFile)
+            .where(SharedFile.team_id == team.team_id)
+            .order_by(SharedFile.created_at.desc())
+        )
+        files = result.scalars().all()
+        
+        return {
+            "success": True,
+            "files": [
+                {
+                    "file_id": f.file_id,
+                    "name": f.file_name,
+                    "size": f"{f.file_size / 1024 / 1024:.2f} MB" if f.file_size else "0 MB",
+                    "type": getattr(f, 'file_type', 'unknown'),
+                    "uploader": f.uploaded_by,
+                    "date": f.created_at.strftime("%Y-%m-%d") if f.created_at else "",
+                    "s3_key": f.s3_key
+                }
+                for f in files
+            ]
         }
-    ]
+    except Exception as e:
+        logger.error(f"파일 목록 조회 실패: {str(e)}")
+        return {"success": False, "files": [], "message": str(e)}
 
 @router.get("/{project_id}/meetings")
 async def get_meetings(project_id: int):
@@ -836,45 +863,7 @@ async def get_user_teams(user_id: str, db: AsyncSession = Depends(get_db)):
         logger.error(f"사용자 팀 목록 조회 실패: {str(e)}")
         return {"status": "error", "message": str(e), "data": []}
 
-@router.get("/{project_id}/files")
-async def get_team_files(project_id: int, db: AsyncSession = Depends(get_db)):
-    """팀 파일 목록 조회"""
-    try:
-        from app.models.team import Team # SharedFile은 이미 위에서 import 됨/또는 여기서 다시 import
-        
-        # 팀 ID 조회
-        team_result = await db.execute(select(Team).where(Team.project_id == project_id))
-        team = team_result.scalar_one_or_none()
-        
-        if not team:
-            return {"status": "error", "message": "팀을 찾을 수 없습니다.", "data": []}
-            
-        # 파일 목록 조회
-        result = await db.execute(
-            select(SharedFile)
-            .where(SharedFile.team_id == team.team_id)
-            .order_by(SharedFile.created_at.desc())
-        )
-        files = result.scalars().all()
-        
-        return {
-            "status": "success",
-            "data": [
-                {
-                    "file_id": f.file_id,
-                    "name": f.file_name,
-                    "size": f"{f.file_size / 1024 / 1024:.2f} MB" if f.file_size else "0 MB",
-                    "type": f.file_type,
-                    "uploader": f.uploaded_by,
-                    "date": f.created_at.strftime("%Y-%m-%d"),
-                    "url": f.file_url
-                }
-                for f in files
-            ]
-        }
-    except Exception as e:
-        logger.error(f"파일 목록 조회 실패: {str(e)}")
-        return {"status": "error", "message": str(e), "data": []}
+# 중복 API 제거됨 - 파일 목록 조회는 167줄에 정의됨
 
 @router.post("/{project_id}/files")
 async def upload_team_file(
@@ -897,7 +886,7 @@ async def upload_team_file(
         team = team_result.scalar_one_or_none()
         
         if not team:
-            return {"status": "error", "message": "팀을 찾을 수 없습니다."}
+            return {"success": False, "message": "팀을 찾을 수 없습니다."}
             
         # 로컬 저장 경로
         upload_dir = f"uploaded_files/{project_id}"
@@ -927,10 +916,10 @@ async def upload_team_file(
         db.add(new_file)
         await db.commit()
         
-        return {"status": "success", "message": "파일 업로드 완료"}
+        return {"success": True, "message": "파일 업로드 완료"}
     except Exception as e:
         logger.error(f"파일 업로드 실패: {str(e)}")
-        return {"status": "error", "message": str(e)}
+        return {"success": False, "message": str(e)}
 
 
 # ============= 추가 API (프론트엔드 연동용) =============

@@ -2,6 +2,9 @@
 """
 MSA 전체 서비스 시드 데이터 생성 스크립트
 ERD v2 기준으로 작성됨
+
+⚠️ 주의: 이 스크립트는 개발/테스트 환경에서만 사용하세요.
+프로덕션 환경에서는 실제 Cognito 회원가입을 통해 사용자를 생성해야 합니다.
 """
 import sys
 import os
@@ -28,51 +31,32 @@ TEAM_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_TEA
 AI_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_AI}"
 SUPPORT_URL = f"mysql+pymysql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_SUPPORT}"
 
-# --- Test Data ---
-ADMIN_ID = "admin-uuid-0000"
-MEMBER_ID = "user2-uuid-5678"
-MEMBER2_ID = "user3-uuid-9999"
+# --- Sample Data IDs ---
+# ⚠️ 실제 사용 시 Cognito에서 발급받은 user_id(sub)로 교체 필요
+SAMPLE_USER_ID = "sample-user-uuid-0001"
 PROJECT_ID = 1
 
 def seed_auth():
-    """Auth 서비스: users, user_stacks"""
+    """Auth 서비스: 샘플 데이터 (실제 사용자는 Cognito 회원가입으로 생성)"""
     print(f"🔹 Seeding Auth DB ({DB_AUTH})...")
     engine = create_engine(AUTH_URL)
     with engine.connect() as conn:
         trans = conn.begin()
         try:
-            # Users 삽입
-            conn.execute(text(f"""
-                INSERT INTO users (user_id, email, nickname, role, test_count, created_at)
-                VALUES 
-                ('{ADMIN_ID}', 'admin@example.com', 'AdminLeader', 'ADMIN', 99, NOW()),
-                ('{MEMBER_ID}', 'member@example.com', 'TeamMember', 'USER', 5, NOW()),
-                ('{MEMBER2_ID}', 'member2@example.com', 'Designer', 'USER', 3, NOW())
-                ON DUPLICATE KEY UPDATE nickname=VALUES(nickname), role=VALUES(role)
-            """))
-            
-            # User Stacks 삽입
-            conn.execute(text(f"""
-                INSERT INTO user_stacks (user_id, position_type, stack_name, created_at)
-                VALUES 
-                ('{ADMIN_ID}', 'BACKEND', 'Spring', NOW()),
-                ('{ADMIN_ID}', 'BACKEND', 'MySQL', NOW()),
-                ('{MEMBER_ID}', 'BACKEND', 'Nodejs', NOW()),
-                ('{MEMBER_ID}', 'BACKEND', 'PostgreSQL', NOW()),
-                ('{MEMBER2_ID}', 'DESIGN', 'Figma', NOW()),
-                ('{MEMBER2_ID}', 'FRONTEND', 'React', NOW())
-                ON DUPLICATE KEY UPDATE stack_name=VALUES(stack_name)
-            """))
+            # ⚠️ 참고: 실제 사용자는 Cognito 회원가입을 통해 생성됩니다.
+            # 이 시드 데이터는 DB 구조 테스트용입니다.
+            print("  ℹ️  Auth 서비스는 Cognito 회원가입으로 사용자 생성")
+            print("  ℹ️  회원가입: http://localhost:3000/#/signup")
             
             trans.commit()
-            print("  ✅ Users & User Stacks seeded.")
+            print("  ✅ Auth DB 준비 완료")
         except Exception as e:
             trans.rollback()
             print(f"  ❌ Error in seed_auth: {e}")
             raise
 
 def seed_project():
-    """Project 서비스: projects, project_recruitment_positions, applications"""
+    """Project 서비스: 샘플 프로젝트 데이터"""
     print(f"🔹 Seeding Project DB ({DB_PROJECT})...")
     engine = create_engine(PROJECT_URL)
     with engine.connect() as conn:
@@ -90,39 +74,19 @@ def seed_project():
             except: pass
             conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
             
-            # Projects 삽입 (ERD 기준)
-            conn.execute(text(f"""
-                INSERT INTO projects (project_id, user_id, title, description, type, method, status, start_date, end_date, test_required, views, created_at)
-                VALUES 
-                ({PROJECT_ID}, '{ADMIN_ID}', 'MSA Portforge Refactoring', 'MSA 구조로 리팩토링하는 프로젝트입니다.', 'PROJECT', 'ONLINE', 'RECRUITING', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 30 DAY), TRUE, 0, NOW())
-            """))
-
-            # Project Recruitment Positions 삽입
-            conn.execute(text(f"""
-                INSERT INTO project_recruitment_positions (project_id, position_type, required_stacks, target_count, current_count, recruitment_deadline, created_at)
-                VALUES 
-                ({PROJECT_ID}, 'BACKEND', 'Spring,Nodejs', 2, 1, DATE_ADD(CURDATE(), INTERVAL 7 DAY), NOW()),
-                ({PROJECT_ID}, 'FRONTEND', 'React,TypeScript', 2, 0, DATE_ADD(CURDATE(), INTERVAL 7 DAY), NOW()),
-                ({PROJECT_ID}, 'DESIGN', 'Figma', 1, 0, DATE_ADD(CURDATE(), INTERVAL 7 DAY), NOW())
-            """))
-
-            # Applications 삽입 (prefer_stacks 컬럼 제거됨)
-            conn.execute(text(f"""
-                INSERT INTO applications (project_id, user_id, position_type, message, status, created_at)
-                VALUES 
-                ({PROJECT_ID}, '{MEMBER_ID}', 'BACKEND', '열심히하겠습니다!', 'ACCEPTED', NOW()),
-                ({PROJECT_ID}, '{MEMBER2_ID}', 'DESIGN', '디자인 경험 많습니다!', 'PENDING', NOW())
-            """))
+            # ⚠️ 프로젝트는 실제 사용자가 생성해야 합니다.
+            # 샘플 프로젝트는 user_id가 없으므로 생성하지 않습니다.
+            print("  ℹ️  프로젝트는 로그인 후 직접 생성하세요")
             
             trans.commit()
-            print("  ✅ Projects, Positions & Applications seeded.")
+            print("  ✅ Project DB 준비 완료")
         except Exception as e:
             trans.rollback()
             print(f"  ❌ Error in seed_project: {e}")
             raise
 
 def seed_team():
-    """Team 서비스: teams, team_members, tasks"""
+    """Team 서비스: 테이블 초기화"""
     print(f"🔹 Seeding Team DB ({DB_TEAM})...")
     engine = create_engine(TEAM_URL)
     with engine.connect() as conn:
@@ -140,43 +104,18 @@ def seed_team():
             except: pass
             conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
             
-            # Teams 삽입
-            conn.execute(text(f"""
-                INSERT INTO teams (project_id, name, s3_key, created_at)
-                VALUES ({PROJECT_ID}, 'MSA Team', 'teams/{PROJECT_ID}/', NOW())
-            """))
-            
-            # Get Team ID
-            team_res = conn.execute(text(f"SELECT team_id FROM teams WHERE project_id={PROJECT_ID}"))
-            team_id = team_res.scalar()
-            
-            if team_id:
-                # Team Members 삽입
-                conn.execute(text(f"""
-                    INSERT INTO team_members (team_id, user_id, role, position_type, updated_at)
-                    VALUES 
-                    ({team_id}, '{ADMIN_ID}', 'LEADER', 'BACKEND', NOW()),
-                    ({team_id}, '{MEMBER_ID}', 'MEMBER', 'BACKEND', NOW())
-                """))
-
-                # Tasks 삽입
-                conn.execute(text(f"""
-                    INSERT INTO tasks (project_id, title, description, status, priority, created_by, assignee_id, due_date, created_at)
-                    VALUES
-                    ({PROJECT_ID}, '기획서 작성', '노션에 기획서 정리', 'DONE', 'HIGH', '{ADMIN_ID}', '{ADMIN_ID}', DATE_ADD(NOW(), INTERVAL 1 DAY), NOW()),
-                    ({PROJECT_ID}, 'DB 설계', 'ERD 작성 및 공유', 'IN_PROGRESS', 'HIGH', '{ADMIN_ID}', '{MEMBER_ID}', DATE_ADD(NOW(), INTERVAL 3 DAY), NOW()),
-                    ({PROJECT_ID}, 'API 구현', 'User API 구현', 'TODO', 'MEDIUM', '{ADMIN_ID}', '{MEMBER_ID}', DATE_ADD(NOW(), INTERVAL 7 DAY), NOW())
-                """))
+            # ⚠️ 팀은 프로젝트 생성 시 자동으로 생성됩니다.
+            print("  ℹ️  팀은 프로젝트 생성 시 자동 생성됩니다")
             
             trans.commit()
-            print("  ✅ Teams, Members & Tasks seeded.")
+            print("  ✅ Team DB 준비 완료")
         except Exception as e:
             trans.rollback()
             print(f"  ❌ Error in seed_team: {e}")
             raise
 
 def seed_ai():
-    """AI 서비스: tests, test_results, portfolios"""
+    """AI 서비스: 샘플 테스트 문제"""
     print(f"🔹 Seeding AI DB ({DB_AI})...")
     engine = create_engine(AI_URL)
     with engine.connect() as conn:
@@ -203,22 +142,15 @@ def seed_ai():
                 ('Nodejs', '{"q": "Node.js의 비동기 처리 방식은?", "options": ["A", "B", "C", "D"], "answer": "C", "explanation": "..."}', '초급', NOW())
             """))
             
-            # Test Results 삽입 (MEMBER가 테스트 응시)
-            conn.execute(text(f"""
-                INSERT INTO test_results (user_id, project_id, test_type, score, feedback, created_at)
-                VALUES 
-                ('{MEMBER_ID}', {PROJECT_ID}, 'APPLICATION', 85, '우수한 성적입니다!', NOW())
-            """))
-            
             trans.commit()
-            print("  ✅ Tests & Test Results seeded.")
+            print("  ✅ AI 샘플 테스트 문제 생성 완료")
         except Exception as e:
             trans.rollback()
             print(f"  ❌ Error in seed_ai: {e}")
             raise
 
 def seed_support():
-    """Support 서비스: notifications, notices, banners"""
+    """Support 서비스: 공지사항, 배너"""
     print(f"🔹 Seeding Support DB ({DB_SUPPORT})...")
     engine = create_engine(SUPPORT_URL)
     with engine.connect() as conn:
@@ -236,32 +168,24 @@ def seed_support():
             except: pass
             conn.execute(text("SET FOREIGN_KEY_CHECKS = 1"))
             
-            # Notifications 삽입
-            conn.execute(text(f"""
-                INSERT INTO notifications (user_id, message, link, is_read, created_at)
-                VALUES 
-                ('{ADMIN_ID}', '새로운 지원자가 있습니다!', '/projects/{PROJECT_ID}/applications', 0, NOW()),
-                ('{MEMBER_ID}', '지원이 승인되었습니다!', '/projects/{PROJECT_ID}', 0, NOW())
-            """))
-            
             # Notices 삽입
             conn.execute(text("""
                 INSERT INTO notices (title, content, created_at)
                 VALUES 
-                ('서비스 점검 안내', '2026년 1월 10일 새벽 2시~4시 서비스 점검이 있습니다.', NOW()),
-                ('신규 기능 출시', 'AI 포트폴리오 자동 생성 기능이 추가되었습니다!', NOW())
+                ('Portforge 서비스 오픈!', '프로젝트 팀 매칭 플랫폼 Portforge가 오픈했습니다. 회원가입 후 이용해주세요!', NOW()),
+                ('신규 기능 안내', 'AI 기반 역량 테스트 기능이 추가되었습니다.', NOW())
             """))
             
             # Banners 삽입
             conn.execute(text("""
                 INSERT INTO banners (title, link, is_active, created_at)
                 VALUES 
-                ('2026 신년 이벤트', '/events/newyear', 1, NOW()),
-                ('프로젝트 매칭 서비스', '/projects', 1, NOW())
+                ('프로젝트 팀원 모집', '/projects', 1, NOW()),
+                ('이벤트 참여하기', '/events', 1, NOW())
             """))
             
             trans.commit()
-            print("  ✅ Notifications, Notices & Banners seeded.")
+            print("  ✅ 공지사항 & 배너 생성 완료")
         except Exception as e:
             trans.rollback()
             print(f"  ❌ Error in seed_support: {e}")
@@ -285,12 +209,11 @@ if __name__ == "__main__":
         seed_support()
         
         print("=" * 60)
-        print("✅ All data seeded successfully!")
-        print("\n📋 Test Accounts:")
-        print(f"   👤 ADMIN:  {ADMIN_ID} (admin@example.com)")
-        print(f"   👤 MEMBER: {MEMBER_ID} (member@example.com)")
-        print(f"   👤 MEMBER2: {MEMBER2_ID} (member2@example.com)")
-        print(f"\n📊 Project ID: {PROJECT_ID}")
+        print("✅ 데이터베이스 초기화 완료!")
+        print("\n📋 시작하기:")
+        print("   1. 서비스 시작: .\\start_services.bat")
+        print("   2. 접속: http://localhost:3000")
+        print("   3. 회원가입 후 로그인")
         
     except Exception as e:
         print("=" * 60)

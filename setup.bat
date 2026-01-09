@@ -124,55 +124,16 @@ if not exist "Support_Communication_Service\.env" (
 echo.
 
 :: ========================================
-:: 3. Python 의존성 설치
+:: 3. Python 의존성 설치 (venv 검증 포함)
 :: ========================================
-echo [3/7] Python 의존성 설치 중... (시간이 걸릴 수 있습니다)
+echo [3/7] Python 의존성 설치 중...
 
-:: 루트
-if exist "pyproject.toml" (
-    echo    📦 루트 패키지 설치 중...
-    call poetry install --no-root --quiet 2>nul
-)
-
-:: Auth
-if exist "Auth\pyproject.toml" (
-    echo    📦 Auth 서비스 패키지 설치 중...
-    cd Auth
-    call poetry install --no-root --quiet 2>nul
-    cd ..
-)
-
-:: Project_Service
-if exist "Project_Service\pyproject.toml" (
-    echo    📦 Project 서비스 패키지 설치 중...
-    cd Project_Service
-    call poetry install --no-root --quiet 2>nul
-    cd ..
-)
-
-:: Team-BE
-if exist "Team-BE\pyproject.toml" (
-    echo    📦 Team 서비스 패키지 설치 중...
-    cd Team-BE
-    call poetry install --no-root --quiet 2>nul
-    cd ..
-)
-
-:: Ai
-if exist "Ai\pyproject.toml" (
-    echo    📦 AI 서비스 패키지 설치 중...
-    cd Ai
-    call poetry install --no-root --quiet 2>nul
-    cd ..
-)
-
-:: Support_Communication_Service
-if exist "Support_Communication_Service\pyproject.toml" (
-    echo    📦 Support 서비스 패키지 설치 중...
-    cd Support_Communication_Service
-    call poetry install --no-root --quiet 2>nul
-    cd ..
-)
+:: 서비스별 venv 검증 및 설치 함수 호출
+call :install_service "Auth"
+call :install_service "Project_Service"
+call :install_service "Team-BE"
+call :install_service "Ai"
+call :install_service "Support_Communication_Service"
 
 echo    ✅ Python 의존성 설치 완료
 echo.
@@ -184,7 +145,20 @@ echo [4/7] Frontend 의존성 설치 중...
 
 if exist "FE\package.json" (
     cd FE
-    call npm install --silent 2>nul
+    if exist "node_modules" (
+        :: node_modules 유효성 검사
+        if exist "node_modules\.package-lock.json" (
+            echo    ⏭️  FE/node_modules 이미 존재, 업데이트 확인 중...
+            call npm install --silent 2>nul
+        ) else (
+            echo    🔄 FE/node_modules 손상됨, 재설치 중...
+            rmdir /s /q node_modules 2>nul
+            call npm install --silent 2>nul
+        )
+    ) else (
+        echo    📦 FE 패키지 설치 중...
+        call npm install --silent 2>nul
+    )
     cd ..
     echo    ✅ Frontend 의존성 설치 완료
 ) else (
@@ -275,12 +249,12 @@ echo ╔════════════════════════
 echo ║                    🎉 환경 설정 완료!                    ║
 echo ╠══════════════════════════════════════════════════════════╣
 echo ║                                                          ║
-echo ║  서비스 시작: start_services.bat                         ║
+echo ║  서비스 시작: .\start_services.bat                       ║
 echo ║  접속 주소:   http://localhost:3000                      ║
 echo ║                                                          ║
-echo ║  테스트 계정:                                            ║
-echo ║    - admin@example.com / devpass123                      ║
-echo ║    - member@example.com / devpass123                     ║
+echo ║  시작하기:                                               ║
+echo ║    1. 회원가입 (이메일 인증 필요)                        ║
+echo ║    2. 로그인 후 프로젝트 생성/참여                       ║
 echo ║                                                          ║
 echo ╚══════════════════════════════════════════════════════════╝
 echo.
@@ -291,3 +265,46 @@ if /i "%start_now%"=="Y" (
 )
 
 endlocal
+exit /b 0
+
+:: ========================================
+:: 서비스별 venv 검증 및 설치 함수
+:: ========================================
+:install_service
+set "service=%~1"
+
+if not exist "%service%\pyproject.toml" (
+    goto :eof
+)
+
+echo    📦 %service% 서비스 확인 중...
+
+cd %service%
+
+:: .venv 존재 여부 확인
+if exist ".venv" (
+    :: .venv 유효성 검사 (python 실행 가능 여부)
+    if exist ".venv\Scripts\python.exe" (
+        :: python 실행 테스트
+        .venv\Scripts\python.exe --version >nul 2>&1
+        if errorlevel 1 (
+            echo       🔄 %service%/.venv 손상됨, 재생성 중...
+            rmdir /s /q .venv 2>nul
+            call poetry install --no-root --quiet 2>nul
+        ) else (
+            :: poetry.lock 변경 확인하여 업데이트 필요 여부 판단
+            echo       ⏭️  %service%/.venv 유효, 패키지 동기화 중...
+            call poetry install --no-root --quiet 2>nul
+        )
+    ) else (
+        echo       🔄 %service%/.venv 불완전, 재생성 중...
+        rmdir /s /q .venv 2>nul
+        call poetry install --no-root --quiet 2>nul
+    )
+) else (
+    echo       📦 %service%/.venv 생성 중...
+    call poetry install --no-root --quiet 2>nul
+)
+
+cd ..
+goto :eof

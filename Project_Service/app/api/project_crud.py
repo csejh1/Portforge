@@ -157,6 +157,7 @@ def convert_position_type(position_str: str) -> StackCategory:
         "DB": StackCategory.DB,
         "인프라": StackCategory.INFRA,
         "기타": StackCategory.ETC,
+        "스터디원": StackCategory.ETC,  # 스터디용
     }
     return mapping.get(position_str, StackCategory.BACKEND)
 
@@ -197,6 +198,8 @@ async def get_projects(
         
         project_list = []
         for p in projects:
+            logger.info(f"📋 프로젝트 {p.project_id}: {p.title}, 포지션 수: {len(p.recruitment_positions) if p.recruitment_positions else 0}")
+            
             # 마감일 계산
             deadline = "D-?"
             if p.recruitment_positions:
@@ -211,37 +214,70 @@ async def get_projects(
                     else:
                         deadline = "모집마감"
             
-            # 인원 수 계산
-            total_target = sum(pos.target_count or 0 for pos in p.recruitment_positions)
-            total_current = sum(pos.current_count or 0 for pos in p.recruitment_positions)
+            # 인원 수 계산 - 포지션별로 표시
+            members_parts = []
+            for pos in p.recruitment_positions:
+                pos_name = pos.position_type.value if pos.position_type else "미정"
+                # 한글 포지션명으로 변환
+                pos_name_kr = {
+                    "FRONTEND": "프론트엔드",
+                    "BACKEND": "백엔드",
+                    "DESIGN": "디자인",
+                    "DB": "DB",
+                    "INFRA": "인프라",
+                    "ETC": "기타"
+                }.get(pos_name, pos_name)
+                current = pos.current_count or 0
+                target = pos.target_count or 0
+                members_parts.append(f"{pos_name_kr} {current}/{target}")
+            
+            members_str = ", ".join(members_parts) if members_parts else "0/0명"
             
             # 기술 스택 추출
             all_stacks = set()
             for pos in p.recruitment_positions:
+                logger.info(f"  📦 포지션 {pos.position_type}: required_stacks = {repr(pos.required_stacks)}")
                 if pos.required_stacks:
                     try:
                         stacks = json.loads(pos.required_stacks) if isinstance(pos.required_stacks, str) else []
+                        logger.info(f"    → 파싱된 스택: {stacks}")
                         all_stacks.update(stacks)
-                    except:
-                        pass
+                    except Exception as e:
+                        logger.error(f"    → 파싱 실패: {e}")
+            
+            logger.info(f"  📋 최종 tags: {list(all_stacks)}")
             
             project_list.append({
                 "id": p.project_id,
+                "project_id": p.project_id,  # 호환성을 위해 둘 다 제공
                 "type": "프로젝트" if p.type == ProjectType.PROJECT else "스터디",
                 "title": p.title,
                 "description": p.description,
                 "deadline": deadline,
                 "views": p.views or 0,
-                "members": f"{total_current}/{total_target}명",
-                "tags": list(all_stacks) if all_stacks else ["기술스택 미정"],
+                "members": members_str,
+                "tags": list(all_stacks) if all_stacks else [],
                 "position": p.recruitment_positions[0].position_type.value if p.recruitment_positions else "미정",
                 "method": get_method_display_name(p.method),
                 "status": "모집중" if p.status == ProjectStatus.RECRUITING else "진행중",
                 "authorId": p.user_id,
+                "user_id": p.user_id,  # 호환성을 위해 둘 다 제공
                 "authorName": "",  # Team Service에서 조회 필요
                 "startDate": p.start_date.isoformat() if p.start_date else None,
+                "start_date": p.start_date.isoformat() if p.start_date else None,
                 "endDate": p.end_date.isoformat() if p.end_date else None,
+                "end_date": p.end_date.isoformat() if p.end_date else None,
                 "testRequired": p.test_required or False,
+                "test_required": p.test_required or False,
+                "recruitment_positions": [
+                    {
+                        "position_type": pos.position_type.value if pos.position_type else "UNKNOWN",
+                        "required_stacks": json.loads(pos.required_stacks) if isinstance(pos.required_stacks, str) and pos.required_stacks else [],
+                        "target_count": pos.target_count or 0,
+                        "current_count": pos.current_count or 0,
+                        "recruitment_deadline": pos.recruitment_deadline.isoformat() if pos.recruitment_deadline else None,
+                    } for pos in p.recruitment_positions
+                ],
             })
         
         return project_list
@@ -343,8 +379,15 @@ async def create_project(project_data: dict, db: AsyncSession = Depends(get_db))
             project_type = ProjectType.PROJECT  # 기본값
         
         # 진행 방식 처리
-        method_str = project_data.get("method", "온라인")
-        method_map = {"온라인": ProjectMethod.ONLINE, "오프라인": ProjectMethod.OFFLINE, "믹스": ProjectMethod.MIXED}
+        method_str = project_data.get("method", "ONLINE")
+        method_map = {
+            "온라인": ProjectMethod.ONLINE, 
+            "오프라인": ProjectMethod.OFFLINE, 
+            "믹스": ProjectMethod.MIXED,
+            "ONLINE": ProjectMethod.ONLINE,
+            "OFFLINE": ProjectMethod.OFFLINE,
+            "MIXED": ProjectMethod.MIXED,
+        }
         project_method = method_map.get(method_str, ProjectMethod.ONLINE)
         
         # ✅ Step 1: 프로젝트 생성
@@ -365,19 +408,32 @@ async def create_project(project_data: dict, db: AsyncSession = Depends(get_db))
         logger.info(f"✅ Step 1: 프로젝트 생성됨 (ID: {project_id})")
         
         # 모집 포지션 생성
-        positions_data = project_data.get("positions", [])
-        recruit_deadline = None
-        if project_data.get("recruit_deadline"):
-            try:
-                recruit_deadline = datetime.strptime(project_data["recruit_deadline"], "%Y-%m-%d").date()
-            except:
-                pass
+        # 프론트엔드에서 recruitment_positions 또는 positions로 보낼 수 있음
+        positions_data = project_data.get("recruitment_positions") or project_data.get("positions", [])
+        logger.info(f"📋 모집 포지션 데이터: {positions_data}")
+        
+        if not positions_data:
+            logger.warning("⚠️ 모집 포지션 데이터가 비어있습니다!")
         
         total_target_count = 0
         for pos_data in positions_data:
+            logger.info(f"  - 포지션 처리 중: {pos_data}")
             position_type = convert_position_type(pos_data.get("position_type", "백엔드"))
             target_count = pos_data.get("target_count", 1)
             required_stacks = pos_data.get("required_stacks", [])
+            
+            # 🔍 디버그: required_stacks 값 확인
+            logger.info(f"  📦 required_stacks 원본: {required_stacks}")
+            logger.info(f"  📦 required_stacks JSON: {json.dumps(required_stacks, ensure_ascii=False)}")
+            
+            # 각 포지션별 모집 마감일 처리
+            recruit_deadline = None
+            deadline_str = pos_data.get("recruitment_deadline") or project_data.get("recruit_deadline")
+            if deadline_str:
+                try:
+                    recruit_deadline = datetime.strptime(deadline_str, "%Y-%m-%d").date()
+                except:
+                    pass
             
             recruitment_position = ProjectRecruitmentPosition(
                 project_id=project_id,
@@ -389,6 +445,7 @@ async def create_project(project_data: dict, db: AsyncSession = Depends(get_db))
             )
             db.add(recruitment_position)
             total_target_count += target_count
+            logger.info(f"  ✅ 포지션 추가됨: {position_type.value}, 인원: {target_count}")
         
         await db.flush()
         logger.info(f"✅ Step 2: 모집 포지션 생성됨 ({len(positions_data)}개)")
