@@ -1,0 +1,64 @@
+# [Python - Core]
+# 파이썬 실행 시 생성되는 컴파일 파일 및 가상환경
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+.python-version
+.installed.cfg
+*.egg-info/
+*.egg
+manifest
+spec
+
+# [Environment & Secrets]
+# 보안상 절대 올라가면 안 되는 실제 설정 파일
+.env
+.env.local
+.env.dev
+.env.prod
+# (주의) .env.example은 팀원 공유를 위해 제외하지 않습니다.
+
+# [IDEs - Editors]
+# 각 개발자의 개인 에디터 설정
+.vscode/
+.idea/
+.kiro/          # 아키텍트님이 말씀하신 Kiro 에디터 설정
+*.kiro          # Kiro 임시 파일
+.cursor/        # Cursor AI 에디터 설정
+*.swp
+*.swo
+*~
+
+# [OS - System Files]
+# 운영체제에서 자동 생성하는 불필요한 파일
+.DS_Store
+.DS_Store?
+._*
+Thumbs.db
+desktop.ini
+
+# [Testing & Quality]
+# 테스트 및 코드 분석 도구의 캐시 데이터
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.cache
+htmlcov/
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+
+# [Database & Docker]
+# 로컬 데이터베이스 및 도커 관련 임시 파일
+*.db
+*.sqlite3
+docker-compose.override.yml
+
+# [Build & Distribution]
+# 빌드 결과물
+dist/
+build/
+out/

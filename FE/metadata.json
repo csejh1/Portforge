@@ -1,0 +1,7 @@
+{
+  "name": "Portforge - Project Collaboration Platform",
+  "description": "A comprehensive platform for finding project team members, managing team spaces, and participating in contests and hackathons. Based on the provided IA, this application facilitates team formation, project collaboration, and skill assessment.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

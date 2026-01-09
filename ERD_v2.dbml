@@ -1,0 +1,420 @@
+// [ENUM 정의: 기술 스택 및 카테고리]
+Enum StackCategory {
+  FRONTEND
+  BACKEND
+  DB
+  INFRA
+  DESIGN
+  ETC
+}
+
+Enum TechStack {
+  // 프론트엔드
+  React
+  Vue
+  Nextjs
+  Svelte
+  Angular
+  TypeScript
+  JavaScript
+  TailwindCSS
+  StyledComponents
+  Redux
+  Recoil
+  Vite
+  Webpack
+  
+  // 백엔드
+  Java
+  Spring
+  Nodejs
+  Nestjs
+  Go
+  Python
+  Django
+  Flask
+  Express
+  php
+  Laravel
+  GraphQL
+  RubyOnRails
+  CSharp // C#에서 변경
+  DotNET // .NET에서 변경
+  
+  // DB
+  MySQL
+  PostgreSQL
+  MongoDB
+  Redis
+  Oracle
+  SQLite
+  MariaDB
+  Cassandra
+  DynamoDB
+  FirebaseFirestore
+  Prisma
+  
+  // 인프라
+  AWS
+  Docker
+  Kubernetes
+  GCP
+  Azure
+  Terraform
+  Jenkins
+  GithubActions
+  Nginx
+  Linux
+  Vercel
+  Netlify
+  
+  // 디자인
+  Figma
+  AdobeXD
+  Sketch
+  Canva
+  Photoshop
+  Illustrator
+  Blender
+  UIUX_Design // UI/UX 디자인에서 변경
+  Branding
+  
+  // 기타
+  Git
+  Slack
+  Jira
+  Notion
+  Discord
+  Postman
+  Swagger
+  Zeplin
+}
+
+// [1. Auth Service]
+Table users {
+  user_id uuid [not null, pk, note: '🔑 PK: Cognito의 sub(Subject ID)']
+  email varchar(100) [unique, note: '관리/검색용 이메일 스냅샷']
+  nickname varchar(20) [not null]
+  role ENUM('USER', 'ADMIN') [default: 'USER']
+  profile_image_url text
+  liked_project_ids json [note: 'Array: [1, 20, 55]']
+  test_count int [default: 5]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [note: '📝 프로필 수정 일시']
+}
+
+Table user_stacks {
+  stack_id bigint [pk, note: '🔑 PK', increment]
+  user_id uuid [not null]
+  position_type StackCategory [not null]
+  stack_name TechStack [not null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp [default: `now()` ]
+}
+
+// [2. Project Service]
+Table projects {
+  project_id bigint [pk, increment]
+  user_id uuid [not null, note: '🔗 팀장 ID']
+  type ENUM('PROJECT', 'STUDY') [not null]
+  title varchar(100) [not null]
+  description text [not null]
+  method ENUM('ONLINE', 'OFFLINE', 'MIXED') [default: 'ONLINE']
+  status ENUM('RECRUITING', 'PROCEEDING', 'COMPLETED', 'CLOSED') [default: 'RECRUITING']
+  start_date date [not null]
+  end_date date [not null]
+  test_required boolean [default: false]
+  views int [default: 0]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+}
+
+Table project_recruitment_positions {
+  project_id bigint [pk,not null]
+  position_type StackCategory [not null]
+  required_stacks TechStack [not null]
+  employment_type varchar(20)
+  target_count integer
+  current_count integer [default: 0]
+  recruitment_deadline date
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+}
+
+Table applications {
+  application_id bigint [pk, increment]
+  project_id bigint [not null]
+  user_id uuid [not null]
+  position_type StackCategory [not null]
+  prefer_stacks TechStack
+  message text [not null]
+  target_count integer
+  current_count integer [default: 0]
+  status ENUM('PENDING', 'ACCEPTED', 'REJECTED') [default: 'PENDING']
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+}
+
+// [3. Team Service]
+Table teams {
+  team_id bigint [pk, increment]
+  project_id bigint [unique, not null]
+  name varchar(50) [not null]
+  s3_key varchar(1024) [not null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+}
+
+Table team_members {
+  team_id bigint [not null]
+  user_id uuid [not null]
+  role ENUM('LEADER', 'MEMBER') [default: 'MEMBER']
+  position_type StackCategory [not null]
+  updated_at timestamp [default: `now()`]
+  Indexes { (team_id, user_id) [pk] }
+}
+
+Table meeting_notes {
+  note_id bigint [pk, increment]
+  team_id bigint [not null]
+  user_id uuid [not null]
+  s3_key varchar(1024) [not null]
+  created_at timestamp [default: `now()`]
+}
+
+// [Enum for New Types]
+Enum ReportType {
+  MEETING_MINUTES
+  PROJECT_PLAN // 기획서
+  WEEKLY_REPORT
+  PORTFOLIO // 포트폴리오 (일반 리포트 형태일 경우)
+}
+
+Enum TestType {
+  PRACTICE // 연습 모드 (옵션, 현재 정책상 미사용이나 확장성 고려)
+  APPLICATION // 지원 모드
+}
+
+// [4. AI Service - Revised]
+
+// Table generated_test 제거됨 (사용자 요청 반영: 불필요)
+
+// 개별 문제 저장소 (문제은행)
+Table tests {
+  test_id bigint [pk, increment]
+  stack_name TechStack [not null, note: '문제의 카테고리 (React, Java...)']
+  question_json json [not null, note: '단일 문제 데이터 {q, options, answer, explanation}']
+  difficulty varchar(20) [default: '초급']
+  source_prompt text [note: '생성 시 사용된 프롬프트 (Log용)']
+  created_at timestamp [default: `now()`]
+}
+
+// 테스트 응시 결과 (주 3회 제한 체크용)
+Table test_results {
+  result_id bigint [pk, increment]
+  
+  user_id uuid [not null]
+  
+  // 지원 모드일 때만 공고/지원서 ID 매핑 (Null 허용하여 확장성 확보)
+  project_id bigint
+  application_id bigint [unique, note: '1번의 지원 = 1번의 결과']
+  
+  type TestType [default: 'APPLICATION']
+  
+  score int
+  feedback text
+  created_at timestamp [default: `now()`]
+}
+
+// 회의 세션 관리 (채팅 로그 구간 추출용)
+Table meeting_sessions {
+  session_id bigint [pk, increment]
+  team_id bigint [not null]
+  project_id bigint [note: 'DynamoDB 채팅 조회용 파티션 키 구성']
+  start_time timestamp [not null]
+  end_time timestamp [note: '종료 시점 기록']
+  status ENUM('IN_PROGRESS', 'COMPLETED') [default: 'IN_PROGRESS']
+  
+  // 이 회의를 통해 생성된 회의록 리포트 연결
+  generated_report_id bigint
+}
+
+// AI가 생성한 각종 리포트 (회의록, 기획서 등)
+Table generated_reports {
+  report_id bigint [pk, increment]
+  team_id bigint [not null]
+  project_id bigint [note: '프로젝트별 회의록 조회 지원']
+  created_by uuid [not null]
+  
+  report_type varchar(50) [not null, note: 'MEETING_MINUTES, PROJECT_PLAN, WEEKLY_REPORT, PORTFOLIO']
+  status ENUM('PENDING', 'COMPLETED', 'FAILED') [default: 'PENDING', note: '비동기 생성 상태 추적']
+  model_id varchar(100) [note: 'AI 모델 ID 기록용']
+  
+  title varchar(200) [note: 'OO월 OO일 회의록 / OO 프로젝트 기획서']
+  s3_key varchar(1024) [note: 'S3에 JSON으로 저장된 회의록 내용 경로']
+  
+  created_at timestamp [default: `now()`]
+}
+
+// [추가] AI 기반 자동 포트폴리오
+Table portfolios {
+  portfolio_id bigint [pk, increment]
+  user_id uuid [not null, note: '누구의 포트폴리오인가']
+  project_id bigint [not null, note: '어떤 프로젝트 결과물인가']
+  
+  // AI 생성 후 사용자가 수정 가능한 필드들
+  title varchar(200) [default: '프로젝트 회고록']
+  summary text [note: '한 줄 요약']
+  role_description text [note: '내가 맡은 역할 상세']
+  problem_solving text [note: '트러블 슈팅 경험 (회의록 기반 추출)']
+  tech_stack_usage text [note: '사용 기술과 활용 방식']
+  growth_point text [note: '배운 점 및 성장 요소']
+  
+  thumbnail_url varchar(1024)
+  is_public boolean [default: true]
+  
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+}
+
+
+// [5. Support & Comm Service]
+Table project_reports {
+  report_id bigint [pk, increment]
+  user_id uuid [not null, note: '🔗 FK: 신고자(users.user_id)']
+  project_id bigint [not null, note: '🔗 FK: 신고 대상 프로젝트(projects.project_id)']
+  type ENUM('REPORT', 'INQUIRY', 'BUG') [not null]
+  content text [not null]
+  status ENUM('PENDING', 'IN_PROGRESS', 'RESOLVED', 'DISMISSED') [default: 'PENDING']
+  resolution_note text
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+}
+
+Table notifications {
+  notification_id bigint [pk, increment]
+  user_id uuid [not null]
+  message text
+  link text
+  is_read boolean [default: false]
+  created_at timestamp [default: `now()`]
+}
+
+Table notices {
+  notice_id bigint [pk, increment]
+  title varchar(100) [not null]
+  content text [not null]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+}
+
+Table banners {
+  banner_id bigint [pk, increment]
+  title varchar(100)
+  link text
+  is_active boolean [default: true]
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+}
+
+Table events {
+  event_id bigint [pk, increment]
+  title varchar(100)
+  category ENUM(공모전, 해커톤)
+  event_description text
+  image_url text
+  event_date timestamp
+  created_at timestamp [default: `now()`]
+  updated_at timestamp
+}
+
+// [DynamoDB Entities]
+Table team_chats_ddb {
+  project_id bigint [pk, note: '🔑 PK: ROOM#{project_id}']
+  timestamp varchar [note: 'MSG#{timestamp}']
+  message_id varchar(50)
+  user_id uuid
+  message text
+  created_at timestamp
+}
+
+Table chat_rooms_ddb {
+  user_id uuid [pk, note: '🔑 PK: USER#{user_id}']
+  room_id bigint
+  updated_at timestamp
+}
+
+// --- TableGroups ---
+TableGroup Auth_Service {
+  users
+  user_stacks
+}
+
+TableGroup Project_Service {
+  projects
+  project_recruitment_positions
+  applications
+}
+
+TableGroup Team_Service {
+  teams
+  team_members
+}
+
+TableGroup AI_Service {
+  tests
+  test_results
+  meeting_sessions // Added
+  generated_reports
+  portfolios // Added
+  meeting_notes // Legacy(수동 노트용)
+}
+
+TableGroup Support_Communication_Service {
+  project_reports
+  notifications
+  notices
+  banners
+  events
+  team_chats_ddb
+  chat_rooms_ddb
+}
+
+// --- 관계 설정 ---
+Ref: user_stacks.user_id > users.user_id
+Ref: projects.user_id > users.user_id
+Ref: project_recruitment_positions.project_id > projects.project_id
+Ref: applications.project_id > projects.project_id
+Ref: applications.user_id > users.user_id
+Ref: teams.project_id - projects.project_id
+Ref: team_members.user_id > users.user_id
+Ref: meeting_notes.team_id > teams.team_id
+Ref: meeting_notes.user_id > users.user_id
+Ref: project_reports.user_id > users.user_id
+Ref: project_reports.project_id > projects.project_id
+Ref: notifications.user_id > users.user_id
+
+// [AI Service References]
+// 1. 테스트 결과는 유저와 연결
+Ref: test_results.user_id > users.user_id
+// 2. 테스트 결과는 공고 지원(Application)과 연결 (선택적)
+Ref: test_results.application_id - applications.application_id 
+// 3. 테스트 결과는 프로젝트와도 간접 연결 가능 (공고 정보)
+Ref: test_results.project_id > projects.project_id
+
+// 4. 회의 세션은 팀에 종속
+Ref: meeting_sessions.team_id > teams.team_id
+Ref: meeting_sessions.project_id > projects.project_id
+// 5. 회의 세션이 끝나면 생성된 리포트와 연결 (회의록)
+Ref: meeting_sessions.generated_report_id - generated_reports.report_id
+
+// 6. 생성된 리포트(회의록/기획서)는 팀과 유저(생성 요청자)에 연결
+Ref: generated_reports.team_id > teams.team_id
+Ref: generated_reports.project_id > projects.project_id
+Ref: generated_reports.created_by > users.user_id
+
+// 7. 포트폴리오는 유저와 해당 프로젝트에 연결
+Ref: portfolios.user_id > users.user_id
+Ref: portfolios.project_id > projects.project_id
+
+Ref: "applications"."position_type" < "team_members"."position_type"

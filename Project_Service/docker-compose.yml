@@ -1,0 +1,43 @@
+version: '3.8'
+services:
+  # 1. MySQL (RDB) - 5.7 버전으로 변경하여 인증 문제 해결
+  mysql:
+    image: mysql:5.7
+    container_name: template-mysql
+    ports: ["3306:3306"]
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: my_app_db
+      MYSQL_USER: user
+      MYSQL_PASSWORD: password
+    volumes: ["mysql_data:/var/lib/mysql"]
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci --bind-address=0.0.0.0
+
+  # 2. DynamoDB Local (NoSQL)
+  ddb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: template-ddb
+    ports:
+      - "8001:8000"
+    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath ./data"
+    volumes:
+      - ddb_data:/home/dynamodblocal/data
+
+  # 3. MinIO (S3 호환 저장소)
+  s3:
+    image: minio/minio
+    container_name: template-s3
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: admin
+      MINIO_ROOT_PASSWORD: password
+    command: server /data --console-address ":9001"
+    volumes:
+      - s3_data:/data
+
+volumes:
+  mysql_data:
+  ddb_data:
+  s3_data:
