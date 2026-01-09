@@ -229,14 +229,7 @@ cd ..
 
 echo    ✅ 테이블 생성 완료
 
-:: 시드 데이터 삽입
-echo    🌱 시드 데이터 삽입 중...
-python seed_all.py >nul 2>&1
-if errorlevel 1 (
-    echo    ⚠️  시드 데이터 삽입 중 일부 오류 (무시 가능)
-) else (
-    echo    ✅ 시드 데이터 삽입 완료
-)
+echo    ✅ 데이터베이스 초기화 완료 (시드 데이터 없음)
 
 echo.
 
@@ -253,8 +246,8 @@ echo ║  서비스 시작: .\start_services.bat                       ║
 echo ║  접속 주소:   http://localhost:3000                      ║
 echo ║                                                          ║
 echo ║  시작하기:                                               ║
-echo ║    1. 회원가입 (이메일 인증 필요)                        ║
-echo ║    2. 로그인 후 프로젝트 생성/참여                       ║
+echo ║    1. 회원가입 후 로그인                                 ║
+echo ║    2. 프로젝트 생성/참여                                 ║
 echo ║                                                          ║
 echo ╚══════════════════════════════════════════════════════════╝
 echo.
