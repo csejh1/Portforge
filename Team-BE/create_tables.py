@@ -1,4 +1,15 @@
 """Team 서비스 테이블 생성 (동기 방식)"""
+import sys
+import os
+
+# pymysql 설치 확인
+try:
+    import pymysql
+except ImportError:
+    print("📦 pymysql 설치 중...")
+    os.system(f"{sys.executable} -m pip install pymysql cryptography -q")
+    import pymysql
+
 from sqlalchemy import create_engine, Column, String, DateTime, BigInteger, ForeignKey, Enum as SQLEnum, Text, Integer
 from sqlalchemy.dialects.mysql import CHAR
 from sqlalchemy.orm import declarative_base, relationship

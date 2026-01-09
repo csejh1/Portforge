@@ -207,27 +207,55 @@ echo [6/7] 데이터베이스 초기화 중...
 :: 테이블 생성
 echo    📋 테이블 생성 중...
 
+echo    - Auth 테이블 생성...
 cd Auth
-call poetry run python create_tables.py >nul 2>&1
+call poetry run python create_tables.py
+if errorlevel 1 (
+    echo    ⚠️  Auth 테이블 생성 실패
+) else (
+    echo    ✅ Auth 테이블 생성 완료
+)
 cd ..
 
+echo    - Project 테이블 생성...
 cd Project_Service
-call poetry run python create_tables.py >nul 2>&1
+call poetry run python create_tables.py
+if errorlevel 1 (
+    echo    ⚠️  Project 테이블 생성 실패
+) else (
+    echo    ✅ Project 테이블 생성 완료
+)
 cd ..
 
+echo    - Team 테이블 생성...
 cd Team-BE
-call poetry run python create_tables.py >nul 2>&1
+call poetry run python create_tables.py
+if errorlevel 1 (
+    echo    ⚠️  Team 테이블 생성 실패
+) else (
+    echo    ✅ Team 테이블 생성 완료
+)
 cd ..
 
+echo    - AI 테이블 생성...
 cd Ai
-call poetry run python create_tables.py >nul 2>&1
+call poetry run python create_tables.py
+if errorlevel 1 (
+    echo    ⚠️  AI 테이블 생성 실패
+) else (
+    echo    ✅ AI 테이블 생성 완료
+)
 cd ..
 
+echo    - Support 테이블 생성...
 cd Support_Communication_Service
-call poetry run python create_tables.py >nul 2>&1
+call poetry run python create_tables.py
+if errorlevel 1 (
+    echo    ⚠️  Support 테이블 생성 실패
+) else (
+    echo    ✅ Support 테이블 생성 완료
+)
 cd ..
-
-echo    ✅ 테이블 생성 완료
 
 echo    ✅ 데이터베이스 초기화 완료 (시드 데이터 없음)
 

@@ -14,7 +14,12 @@ cd Portforge
 .\setup.bat
 ```
 
-끝! 스크립트가 모든 것을 자동으로 설정합니다.
+### ⚠️ 중요: Cognito 설정
+회원가입/로그인이 작동하려면 `Auth/.env` 파일에 실제 Cognito 값을 설정해야 합니다.
+팀장에게 아래 값들을 받아서 `Auth/.env`에 입력하세요:
+- `COGNITO_USERPOOL_ID`
+- `COGNITO_APP_CLIENT_ID`
+- `COGNITO_DOMAIN` (소셜 로그인 사용 시)
 
 ---
 

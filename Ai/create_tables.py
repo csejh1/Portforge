@@ -5,6 +5,14 @@ AI 서비스 테이블 생성 스크립트
 import sys
 import os
 
+# pymysql 설치 확인
+try:
+    import pymysql
+except ImportError:
+    print("📦 pymysql 설치 중...")
+    os.system(f"{sys.executable} -m pip install pymysql cryptography -q")
+    import pymysql
+
 # 현재 디렉토리를 Python 경로에 추가
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
