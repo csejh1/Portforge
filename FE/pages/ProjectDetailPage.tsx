@@ -154,9 +154,26 @@ const ProjectDetailPage: React.FC = () => {
             : (response?.data?.applications || response?.applications || []);
 
           if (applicationsList.length > 0) {
+            // 사용자 ID 목록 추출
+            const userIds = applicationsList.map((app: any) => app.user_id);
+            
+            // Auth 서비스에서 사용자 닉네임 일괄 조회
+            let usersMap: Record<string, string> = {};
+            try {
+              const { authAPI } = await import('../api/apiClient');
+              const usersData = await authAPI.getUsersBatch(userIds);
+              if (usersData && usersData.length > 0) {
+                usersData.forEach((u: any) => {
+                  usersMap[u.user_id] = u.nickname || u.email?.split('@')[0] || u.user_id;
+                });
+              }
+            } catch (e) {
+              console.warn('사용자 닉네임 조회 실패:', e);
+            }
+
             const apps = applicationsList.map((app: any) => ({
               userId: app.user_id,
-              userName: app.user_id,
+              userName: usersMap[app.user_id] || app.user_id,
               position: app.position_type,
               message: app.message || '',
               status: app.status.toLowerCase(),
@@ -208,7 +225,10 @@ const ProjectDetailPage: React.FC = () => {
   const isTeamMember = teamMembers.some(m => 
     m.user_id === user?.id || String(m.user_id) === String(user?.id)
   );
-  const isAcceptedMember = application?.status === 'accepted' || applicationFromProject?.status === 'accepted' || isTeamMember;
+  // 승인된 멤버인지 확인 (대소문자 모두 처리)
+  const applicationStatus = (application?.status || '').toLowerCase();
+  const applicationFromProjectStatus = (applicationFromProject?.status || '').toLowerCase();
+  const isAcceptedMember = applicationStatus === 'accepted' || applicationFromProjectStatus === 'accepted' || isTeamMember;
   // 리더로 등록된 프로젝트인지 확인 (appliedProjects + 백엔드 팀 멤버 데이터)
   const isLeaderFromApplied = user?.appliedProjects?.some(p => 
     (p.id === projectId || String(p.id) === String(projectId)) && p.userRole === 'Leader'
@@ -250,7 +270,7 @@ const ProjectDetailPage: React.FC = () => {
       else if (r.pos.includes('디자인')) categoryKey = '디자인';
 
       const matchedStack = projectData.tags.find(t => categoryKey && STACK_CATEGORIES_BASE[categoryKey]?.includes(t));
-      const acceptedMembers = projectData.applicants?.filter(a => a.position === r.pos && a.status === 'accepted') || [];
+      const acceptedMembers = projectData.applicants?.filter(a => a.position === r.pos && (a.status || '').toLowerCase() === 'accepted') || [];
       return { ...r, stack: matchedStack || '', acceptedMembers };
     });
   })();
@@ -333,8 +353,8 @@ const ProjectDetailPage: React.FC = () => {
 
   // Review Modal Component (Inline)
   const ReviewModal = () => {
-    // 거절된 지원자를 제외하고 보여줌
-    const visibleApplicants = enrichedApplicants.filter(app => app.status !== 'rejected');
+    // 거절된 지원자를 제외하고 보여줌 (대소문자 모두 처리)
+    const visibleApplicants = enrichedApplicants.filter(app => (app.status || '').toLowerCase() !== 'rejected');
 
     return (
       <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
@@ -349,7 +369,9 @@ const ProjectDetailPage: React.FC = () => {
 
           <div className="flex-1 overflow-y-auto p-8 space-y-4 custom-scrollbar">
             {visibleApplicants.length > 0 ? (
-              visibleApplicants.map((app, idx) => (
+              visibleApplicants.map((app, idx) => {
+                const appStatus = (app.status || '').toLowerCase();
+                return (
                 <div key={idx} className="bg-white border border-gray-100 p-8 rounded-[2rem] hover:shadow-lg transition-all animate-fadeIn">
                   <div className="flex justify-between items-start mb-6">
                     <div className="flex items-center gap-4">
@@ -360,8 +382,8 @@ const ProjectDetailPage: React.FC = () => {
                         <h4 className="text-xl font-black text-text-main">{app.userName}</h4>
                         <div className="flex gap-2 mt-1">
                           <span className="text-xs font-bold text-primary bg-primary/10 px-3 py-1 rounded-lg">{app.position} 지원</span>
-                          <span className={`text-xs font-bold px-3 py-1 rounded-lg ${app.status === 'accepted' ? 'bg-green-100 text-green-600' : app.status === 'rejected' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>
-                            {app.status === 'accepted' ? '승인됨' : app.status === 'rejected' ? '거절됨' : '심사중'}
+                          <span className={`text-xs font-bold px-3 py-1 rounded-lg ${appStatus === 'accepted' ? 'bg-green-100 text-green-600' : appStatus === 'rejected' ? 'bg-red-100 text-red-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                            {appStatus === 'accepted' ? '승인됨' : appStatus === 'rejected' ? '거절됨' : '심사중'}
                           </span>
                         </div>
                       </div>
@@ -420,7 +442,7 @@ const ProjectDetailPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {app.status === 'pending' && (
+                  {appStatus === 'pending' && (
                     <div className="flex gap-3 pt-2">
                       <button
                         onClick={() => {
@@ -445,7 +467,7 @@ const ProjectDetailPage: React.FC = () => {
                     </div>
                   )}
                 </div>
-              ))
+              )})
             ) : (
               <div className="text-center py-20 text-gray-400 font-bold">아직 지원자가 없습니다.</div>
             )}
@@ -488,9 +510,9 @@ const ProjectDetailPage: React.FC = () => {
                   className="w-full bg-white text-text-main border-2 border-gray-100 px-12 py-4 rounded-[2rem] font-bold transition-all shadow-lg hover:shadow-xl hover:bg-gray-50 flex items-center justify-center gap-2"
                 >
                   <span>👥</span> 지원자 관리
-                  {projectData.applicants && projectData.applicants.filter(a => a.status === 'pending').length > 0 && (
+                  {projectData.applicants && projectData.applicants.filter(a => (a.status || '').toLowerCase() === 'pending').length > 0 && (
                     <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse">
-                      {projectData.applicants.filter(a => a.status === 'pending').length}
+                      {projectData.applicants.filter(a => (a.status || '').toLowerCase() === 'pending').length}
                     </span>
                   )}
                 </button>
@@ -512,7 +534,7 @@ const ProjectDetailPage: React.FC = () => {
                   disabled={hasApplied || projectData.status === '모집완료'}
                   className={`px-12 py-5 rounded-[2rem] font-black transition-all shadow-xl text-lg ${hasApplied || projectData.status === '모집완료' ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-primary text-white hover:scale-105 shadow-primary/20'}`}
                 >
-                  {projectData.status === '모집완료' ? '모집이 종료되었습니다' : (hasApplied ? ((application?.status || applicationFromProject?.status) === 'pending' ? '지원 심사 중' : '지원 완료') : '지금 지원하기')}
+                  {projectData.status === '모집완료' ? '모집이 종료되었습니다' : (hasApplied ? (applicationStatus === 'pending' || applicationFromProjectStatus === 'pending' ? '지원 심사 중' : '지원 완료') : '지금 지원하기')}
                 </button>
               )}
             </div>

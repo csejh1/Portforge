@@ -42,7 +42,7 @@ const AuthCallbackPage: React.FC = () => {
                     id: response.user.user_id, // [수정] UUID 사용
                     name: response.user.nickname,
                     email: response.user.email,
-                    role: response.user.role === 'ADMIN' ? 'ADMIN' : 'USER',
+                    role: (response.user.role || '').toUpperCase() === 'ADMIN' ? 'ADMIN' : 'USER',
                     appliedProjects: [],
                     testResults: []
                 };

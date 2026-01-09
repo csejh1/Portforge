@@ -214,7 +214,41 @@ const TeamDashboard = ({ isAdmin }: { isAdmin: boolean }) => {
           const result = await response.json();
           if (result.status === 'success') {
             console.log('✅ 프로젝트 팀 정보 로드 성공:', result.data);
-            setProjectInfo(result.data);
+            
+            // 멤버 닉네임이 user_id와 같으면 Auth 서비스에서 닉네임 조회
+            let projectData = result.data;
+            if (projectData.members && projectData.members.length > 0) {
+              const needsNickname = projectData.members.some((m: any) => 
+                m.nickname === m.user_id || !m.nickname
+              );
+              
+              if (needsNickname) {
+                try {
+                  const { authAPI } = await import('../api/apiClient');
+                  const userIds = projectData.members.map((m: any) => m.user_id);
+                  const usersData = await authAPI.getUsersBatch(userIds);
+                  
+                  if (usersData && usersData.length > 0) {
+                    const usersMap: Record<string, string> = {};
+                    usersData.forEach((u: any) => {
+                      usersMap[u.user_id] = u.nickname || u.email?.split('@')[0] || u.user_id;
+                    });
+                    
+                    projectData = {
+                      ...projectData,
+                      members: projectData.members.map((m: any) => ({
+                        ...m,
+                        nickname: usersMap[m.user_id] || m.nickname || m.user_id
+                      }))
+                    };
+                  }
+                } catch (e) {
+                  console.warn('닉네임 조회 실패:', e);
+                }
+              }
+            }
+            
+            setProjectInfo(projectData);
             setLoading(false);
             return;
           }
@@ -336,7 +370,7 @@ const TeamDashboard = ({ isAdmin }: { isAdmin: boolean }) => {
           <div className="space-y-4">
             {/* 팀장 정보를 members 배열에서 찾아서 표시 */}
             {(() => {
-              const leader = members.find((m: any) => m.role === 'LEADER');
+              const leader = members.find((m: any) => (m.role || '').toUpperCase() === 'LEADER');
               const leaderName = leader ? leader.nickname || leader.user_id : '팀장';
               return (
                 <>
@@ -353,7 +387,7 @@ const TeamDashboard = ({ isAdmin }: { isAdmin: boolean }) => {
           <div className="bg-gray-50/50 p-6 rounded-[2rem] border border-gray-100 space-y-4">
             {/* 팀장과 팀원들을 members 배열에서 가져와서 표시 */}
             {members.map((member: any, idx: number) => {
-              const isLeader = member.role === 'LEADER';
+              const isLeader = (member.role || '').toUpperCase() === 'LEADER';
               // 팀장인 경우 무조건 PM으로 표시, 아니면 실제 포지션 사용
               const roleDisplay = isLeader ? '팀장 / PM' : `팀원 / ${member.position_type}`;
 

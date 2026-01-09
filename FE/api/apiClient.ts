@@ -148,6 +148,25 @@ export const authAPI = {
         return response.json();
     },
 
+    // 사용자 정보 일괄 조회 (닉네임 등)
+    getUsersBatch: async (userIds: string[]): Promise<any[]> => {
+        try {
+            const response = await fetch('/users/batch', {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                body: JSON.stringify(userIds),
+            });
+            if (!response.ok) {
+                console.warn('사용자 정보 일괄 조회 실패');
+                return [];
+            }
+            return response.json();
+        } catch (e) {
+            console.warn('사용자 정보 일괄 조회 오류:', e);
+            return [];
+        }
+    },
+
     // 프로필 수정
     updateProfile: async (data: { name?: string; myStacks?: string[] }): Promise<void> => {
         const response = await fetch('/users/me', {

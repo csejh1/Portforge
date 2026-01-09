@@ -366,7 +366,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                   appliedProjects.push({
                     id: team.project_id,
                     status: 'accepted' as const,
-                    userRole: team.role === 'LEADER' ? 'Leader' : 'Member',
+                    userRole: (team.role || '').toUpperCase() === 'LEADER' ? 'Leader' : 'Member',
                     selectedPosition: team.position,
                     projectTitle: team.name, // 팀 이름 = 프로젝트 이름
                   });
@@ -460,7 +460,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
               appliedProjects.push({
                 id: team.project_id,
                 status: 'accepted' as const,
-                userRole: team.role === 'LEADER' ? 'Leader' : 'Member',
+                userRole: (team.role || '').toUpperCase() === 'LEADER' ? 'Leader' : 'Member',
                 selectedPosition: team.position,
                 projectTitle: team.name, // 팀 이름 = 프로젝트 이름
               });
@@ -471,15 +471,32 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         console.warn('팀 목록 조회 실패:', e);
       }
 
+      // 테스트 결과 조회
+      let testResults: TestResult[] = [];
+      try {
+        const { fetchUserTestResults } = await import('../api/aiClient');
+        const results = await fetchUserTestResults(userId);
+        testResults = results.map(r => ({
+          skill: r.stack,
+          score: r.score,
+          date: r.date,
+          level: r.level,
+          feedback: r.feedback
+        }));
+        console.log('📊 테스트 결과 로드 완료:', testResults);
+      } catch (e) {
+        console.warn('테스트 결과 조회 실패:', e);
+      }
+
       // 사용자 정보 구성
       const loggedInUser: User = {
         id: userId,
         name: response.user.nickname,
         email: response.user.email,
-        role: response.user.role === 'ADMIN' ? 'ADMIN' : 'USER',
+        role: (response.user.role || '').toUpperCase() === 'ADMIN' ? 'ADMIN' : 'USER',
         myStacks: response.user.myStacks || [],
         appliedProjects: appliedProjects,
-        testResults: []
+        testResults: testResults
       };
 
       console.log('✅ 로그인 완료 - appliedProjects:', appliedProjects);
@@ -672,7 +689,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return p;
       }));
       
+      // 4. 현재 로그인한 사용자가 승인된 지원자인 경우 appliedProjects 업데이트
+      if (user && user.id === targetUserId && action === 'accepted') {
+        const updatedAppliedProjects = user.appliedProjects?.map(ap => 
+          ap.id === projectId ? { ...ap, status: 'accepted' as const } : ap
+        ) || [];
+        
+        const updatedUser = { ...user, appliedProjects: updatedAppliedProjects };
+        setUser(updatedUser);
+        localStorage.setItem('portforge_v8_user', JSON.stringify(updatedUser));
+      }
+      
       alert(action === 'accepted' ? '팀원으로 승인되었습니다!' : '지원이 거절되었습니다.');
+      
+      // 5. 페이지 새로고침하여 최신 상태 반영 (선택적)
+      window.location.reload();
       
     } catch (error: any) {
       console.error('지원 처리 실패:', error);

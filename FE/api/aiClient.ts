@@ -70,6 +70,26 @@ export const fetchUserTestResult = async (userId: string): Promise<TestResultAna
     }
 };
 
+// 사용자의 모든 테스트 결과 조회
+export const fetchUserTestResults = async (userId: string): Promise<TestResultAnalysis[]> => {
+    try {
+        const response = await fetch(`/ai/data/test-results/user/${userId}`);
+        if (response.status === 404) return [];
+        if (!response.ok) throw new Error('Failed to fetch user test results');
+        const data = await response.json();
+        return data.map((r: any) => ({
+            score: r.score,
+            stack: r.test_type || 'Unknown',
+            level: r.score >= 80 ? '고급' : r.score >= 60 ? '중급' : '초급',
+            feedback: r.feedback || '',
+            date: r.created_at ? new Date(r.created_at).toLocaleDateString() : new Date().toLocaleDateString()
+        }));
+    } catch (e) {
+        console.error("AI Fetch Error:", e);
+        return [];
+    }
+};
+
 export interface ApplicantData {
     name: string;
     position: string;

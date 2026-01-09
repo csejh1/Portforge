@@ -203,17 +203,21 @@ const TeamSection = ({ user, projects }: { user: User, projects: any[] }) => {
             console.log('✅ 사용자 프로젝트 목록 로드 성공:', result.data);
 
             // 백엔드 데이터를 프론트엔드 형식으로 변환
-            const transformedProjects = result.data.map((project: any) => ({
-              id: project.id,
-              title: project.title,
-              userRole: project.userRole === 'LEADER' ? 'Leader' : project.userRole === 'APPLICANT' ? 'Applicant' : 'Member',
-              selectedPosition: project.position || (project.userRole === 'LEADER' ? '팀장' : '포지션 정보 없음'),
-              status: project.status === '승인됨' ? 'accepted' :
-                project.status === '거절됨' ? 'rejected' :
-                  project.status === '심사중' ? 'pending' : 'accepted',
-              tech_stacks: Array.isArray(project.tags) ? project.tags : [],
-              applicationStatus: project.applicationStatus || null
-            }));
+            const transformedProjects = result.data.map((project: any) => {
+              const projectStatus = (project.status || '').toLowerCase();
+              const projectRole = (project.userRole || '').toUpperCase();
+              return {
+                id: project.id,
+                title: project.title,
+                userRole: projectRole === 'LEADER' ? 'Leader' : projectRole === 'APPLICANT' ? 'Applicant' : 'Member',
+                selectedPosition: project.position || (projectRole === 'LEADER' ? '팀장' : '포지션 정보 없음'),
+                status: projectStatus === '승인됨' || projectStatus === 'accepted' ? 'accepted' :
+                  projectStatus === '거절됨' || projectStatus === 'rejected' ? 'rejected' :
+                    projectStatus === '심사중' || projectStatus === 'pending' ? 'pending' : 'accepted',
+                tech_stacks: Array.isArray(project.tags) ? project.tags : [],
+                applicationStatus: project.applicationStatus || null
+              };
+            });
 
             setUserProjects(transformedProjects);
             setLoading(false);
@@ -249,26 +253,29 @@ const TeamSection = ({ user, projects }: { user: User, projects: any[] }) => {
     <div className="space-y-10 animate-fadeIn">
       <h3 className="text-3xl font-black">참여 중인 팀 및 지원 현황</h3>
       <div className="grid gap-6">
-        {userProjects.length > 0 ? userProjects.map(p => (
+        {userProjects.length > 0 ? userProjects.map(p => {
+          const pStatus = (p.status || '').toLowerCase();
+          const pRole = (p.userRole || '').toLowerCase();
+          return (
           <div key={p.id} className="p-8 border border-gray-100 rounded-[2.5rem] hover:bg-gray-50/50 transition-colors shadow-sm">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6">
               <div className="space-y-2">
                 <div className="flex gap-2">
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${p.userRole === 'Leader' ? 'bg-amber-100 text-amber-600' :
-                    p.userRole === 'Applicant' ? 'bg-blue-100 text-blue-600' :
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${pRole === 'leader' ? 'bg-amber-100 text-amber-600' :
+                    pRole === 'applicant' ? 'bg-blue-100 text-blue-600' :
                       'bg-gray-100 text-gray-500'
                     }`}>
-                    {p.userRole === 'Leader' ? '👑 리더' : p.userRole === 'Applicant' ? '📝 지원자' : '👤 멤버'}
+                    {pRole === 'leader' ? '👑 리더' : pRole === 'applicant' ? '📝 지원자' : '👤 멤버'}
                   </span>
-                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${p.status === 'accepted' ? 'bg-primary/10 text-primary' :
-                    p.status === 'rejected' ? 'bg-red-50 text-red-500' :
+                  <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${pStatus === 'accepted' ? 'bg-primary/10 text-primary' :
+                    pStatus === 'rejected' ? 'bg-red-50 text-red-500' :
                       'bg-yellow-50 text-yellow-500'
                     }`}>
-                    {p.status === 'accepted' ? '승인됨' : p.status === 'rejected' ? '거절됨' : '심사중'}
+                    {pStatus === 'accepted' ? '승인됨' : pStatus === 'rejected' ? '거절됨' : '심사중'}
                   </span>
                 </div>
                 <h4 className="text-xl font-black text-text-main leading-tight">{p.title}</h4>
-                <p className="text-xs text-text-sub font-bold">{p.selectedPosition || (p.userRole === 'Leader' ? '팀 관리' : '포지션 미정')}</p>
+                <p className="text-xs text-text-sub font-bold">{p.selectedPosition || (pRole === 'leader' ? '팀 관리' : '포지션 미정')}</p>
                 {p.tech_stacks && p.tech_stacks.length > 0 && (
                   <div className="flex flex-wrap gap-1 mt-2">
                     {p.tech_stacks.slice(0, 3).map((tech: string, idx: number) => (
@@ -283,12 +290,21 @@ const TeamSection = ({ user, projects }: { user: User, projects: any[] }) => {
                 )}
               </div>
               <Link to={`/projects/${p.id}`} className="bg-primary text-white px-6 py-3 rounded-2xl text-xs font-black shadow-lg shadow-primary/10 whitespace-nowrap hover:scale-105 transition-all">
-                프로젝트 보기 →
+                프로젝트 공고 보기 →
               </Link>
             </div>
 
+            {/* 승인된 프로젝트에 팀 스페이스 버튼 */}
+            {pStatus === 'accepted' && (
+              <div className="mt-4">
+                <Link to={`/team-space/${p.id}`} className="inline-flex items-center gap-2 bg-secondary text-white px-6 py-3 rounded-2xl text-xs font-black shadow-lg shadow-secondary/10 hover:scale-105 transition-all">
+                  🚀 팀 스페이스 이동
+                </Link>
+              </div>
+            )}
+
             {/* 승인된 프로젝트에만 업무 현황 및 파일 공유 바로가기 표시 */}
-            {p.status === 'accepted' && (
+            {pStatus === 'accepted' && (
               <div className="mt-6 pt-6 border-t border-gray-100">
                 <div className="flex flex-wrap gap-3">
                   <Link
@@ -319,7 +335,7 @@ const TeamSection = ({ user, projects }: { user: User, projects: any[] }) => {
               </div>
             )}
           </div>
-        )) : (
+        )}) : (
           <div className="py-20 text-center opacity-40">참여 중인 팀이 없습니다.</div>
         )}
       </div>

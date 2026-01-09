@@ -59,7 +59,7 @@ const OAuthCodeHandler: React.FC<{ children: React.ReactNode }> = ({ children })
           id: response.user.user_id,
           name: response.user.nickname,
           email: response.user.email,
-          role: response.user.role === 'ADMIN' ? 'ADMIN' : 'USER',
+          role: (response.user.role || '').toUpperCase() === 'ADMIN' ? 'ADMIN' : 'USER',
           myStacks: response.user.myStacks || [],
           appliedProjects: [],
           testResults: []
